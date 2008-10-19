@@ -1,0 +1,121 @@
+package scheduling;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Logger;
+
+/**
+ * Implementation of the answer selection process which is described by
+ * Domingues et al.
+ */
+public class SilSTAnswerSelector extends AnswerSelector {
+
+    /** Logger */
+    private static final Logger logger
+        = Logger.getLogger(SilSTAnswerSelector.class.getName());
+
+    private static final double MIN_CERTAINTY = 0.5d;
+
+    private static final double COLLUSION_THRESHOLD = 0.01d;
+
+    /**
+     * Returns the best answer according to the minimal likelihood of
+     * collusion between workers.
+     */
+    <J extends Job<A>,A extends Answer> A selectBestAnswer(List<J> jobs)
+        throws AnswerSelectionException, JobPostponedException {
+        assert(!jobs.isEmpty()) : "No job given to the answer selector";
+        /* In case of other components than SilST */
+        if (jobs.size() < 3)
+            throw new AnswerSelectionException();
+        /* Not enough job has been processed yet */
+        if (gridCharacteristics.getCertainty() < MIN_CERTAINTY)
+            throw new JobPostponedException();
+        Map<A,Set<Worker>> map = AnswerSelector.getJobsByAnswer(jobs);
+
+        /* It means it is the last step of the SilST approach and only strict
+         * majority is needed (step 12) */
+        if (jobs.size() == 6) {
+            /* This happen at the very end when the last jobs are
+             * computed */
+            List<J> lastJobs = jobs.subList(3,6);
+            AnswerSelector answerSelector = new StrictMajorityAnswerSelector();
+            logger.info("Return the best answer based on majority");
+            return answerSelector.selectLessWorseAnswer(lastJobs);
+        }
+
+        /* This one fails if the M2 and M3 colluders detection has not been
+         * done */
+        try {
+            if (jobs.size() == 3 || jobs.size() == 5) {
+                double bestCollusion = 1.0d;
+                A bestAnswer = null;
+                for (Map.Entry<A,Set<Worker>> entry : map.entrySet()) {
+                    final double collusion = gridCharacteristics
+                        .getCollusionLikelihood(entry.getValue());
+                    if (collusion < bestCollusion) {
+                        bestCollusion = collusion;
+                        bestAnswer = entry.getKey();
+                    }
+                }
+                logger.fine("We have " + map.size() + " distinct answers");
+                /* In the case that every worker are colluders (step 10) */
+                if (bestCollusion > COLLUSION_THRESHOLD && jobs.size() == 3) {
+                    logger.info("The current group is colluding");
+                    throw new AnswerSelectionException();
+                }
+                logger.info("The minimal collusion for job " + jobs.get(0)
+                        + " is " + bestCollusion + " for a group of "
+                        + map.get(bestAnswer).size() + " workers on a total of "
+                        + jobs.size() + " executed jobs and corresponds to"
+                        + " answer " + bestAnswer);
+                return bestAnswer;
+            }
+        } catch (TooMuchUncertaintyException e) {}
+
+        /* This one fails if the colluders detection has not been done */
+        try {
+            if (jobs.size() == 3) {
+                for (Map.Entry<A,Set<Worker>> entry : map.entrySet())
+                    /* It means that the group should be extended in order to
+                     * confirm the collusion (step 7) */
+                    if (entry.getValue().size() == 1 && gridCharacteristics
+                            .getCollusionLikelihood(entry.getValue())
+                            < COLLUSION_THRESHOLD) {
+                        logger.info("One single honnest worker is defeated");
+                        throw new AnswerSelectionException();
+                    }
+                /* It is accepted under the condition that there is not M2
+                 * or M3 colluders in this group */
+                throw new JobPostponedException();
+            } else if (jobs.size() == 5)
+                /* Postpone the decision to the moment where all the knowledge
+                 * is available */
+                throw new JobPostponedException();
+            else
+                /* In case of other components than SilST */
+                throw new AnswerSelectionException();
+        } catch (TooMuchUncertaintyException e) {}
+
+        /* Normal behavior until the very end (should not be reached since
+         * the GridCharacteristics certainty has already been checked) */
+        throw new JobPostponedException();
+    }
+
+    /**
+     * Returns an answer in every cases which is the less worse (based on
+     * strict majority).
+     */
+    <J extends Job<A>,A extends Answer> A selectLessWorseAnswer(List<J> jobs) {
+        assert(!jobs.isEmpty()) : "No job given to the answer selector";
+        try {
+            return selectBestAnswer(jobs);
+        } catch (Exception e) {}
+        logger.info("The less worse answer will be selected in a group of size "
+                + jobs.size());
+        AnswerSelector answerSelector = new StrictMajorityAnswerSelector();
+        return answerSelector.selectLessWorseAnswer(jobs);
+    }
+
+}

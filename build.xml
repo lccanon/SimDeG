@@ -1,0 +1,85 @@
+<project default="SimDeG">
+  <property name="build-dir" value="build"/>
+  <property name="src-dir" value="src"/>
+  <property name="jar-file" value="jar/simdeg.jar"/>
+  <property name="main-class" value="simdeg.simulation.Simulator"/>
+  <property name="report-dir" value="report"/>
+  <property name="doc-dir" value="doc"/>
+  <tstamp>
+     <format property="today" pattern="yyyy-MM-dd HH:mm:ss" />
+  </tstamp>
+  <target name="compile">
+    <mkdir dir="${build-dir}"/>
+    <javac srcdir="${src-dir}" destdir="${build-dir}" debug="yes"/>
+  </target>
+  <target name="jar" depends="compile">
+    <jar destfile="${jar-file}" basedir="${build-dir}"
+         includes="**/*.class">
+      <manifest>
+        <attribute name="Built-By" value="${user.name}"/>
+        <attribute name="Built-Date" value="${today}"/>
+        <attribute name="Main-Class" value="${main-class}"/>
+        <attribute name="Class-Path" value=". simgrid.jar flanagan.jar"/>
+      </manifest>
+      <fileset dir="${src-dir}">
+        <include name="**/*.java"/>
+      </fileset>
+    </jar>
+  </target>
+  <target name="run" depends="jar">
+    <java classname="${main-class}"
+          classpath="${jar-file}"
+          fork="true">
+      <jvmarg line="-ea -Djava.util.logging.config.file=property/logging.properties"/>
+      <arg file="example.txt"/>
+    </java>
+  </target>
+  <target name="SimDeG" depends="jar,doc,test">
+    <echo message="SimDeG build file"/>
+  </target>
+  <target name="clean">
+    <delete file="${jar-file}"/>
+    <delete dir="${build-dir}"/>
+    <delete dir="${report-dir}"/>
+    <delete dir="${doc-dir}"/>
+    <delete file="example/conf.txt_platform.xml">
+      <fileset dir="example/" includes="simdeg*.log*"/>
+    </delete>
+  </target>
+  <target name="test" depends="jar">
+    <mkdir dir="${report-dir}"/>
+    <junit printsummary="yes" haltonfailure="no" fork="true">
+      <jvmarg line="-ea"/>
+      <classpath>
+        <pathelement location="${jar-file}"/>
+      </classpath>
+      <batchtest fork="yes" todir="${report-dir}">
+        <formatter type="xml"/>
+        <fileset dir="${build-dir}">
+          <include name="**/*Test*.class"/>
+          <exclude name="**/*Test*$*.class"/>
+        </fileset>
+      </batchtest>
+    </junit>
+    <junitreport todir="${report-dir}">
+      <fileset dir="${report-dir}">
+        <include name="TEST-*.xml" />
+      </fileset>
+      <report todir="${report-dir}" />
+    </junitreport>
+  </target>
+  <target name="doc">
+    <mkdir dir="${doc-dir}"/>
+    <javadoc destdir="${doc-dir}"
+           author="true"
+           version="true"
+           use="true"
+           windowtitle="SimDeG platform"
+           access="private">
+      <packageset dir="${src-dir}" defaultexcludes="yes">
+        <include name="simdeg/**"/>
+      </packageset>
+      <link href="http://java.sun.com/javase/6/docs/api/"/>
+    </javadoc>
+  </target>
+</project>

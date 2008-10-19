@@ -1,0 +1,75 @@
+package scheduling;
+
+import com.Collections;
+import com.RandomManager;
+
+import java.util.Set;
+import java.util.HashSet;
+import java.util.logging.Logger;
+
+/**
+ * Implementation of the GroupCreator process which create groups in
+ * the sabotage tolerant algorithm of Domingues et al.
+ */
+public class SilSTGroupCreator extends GroupCreator {
+
+    /** Logger */
+    private static final Logger logger
+        = Logger.getLogger(SilSTGroupCreator.class.getName());
+
+    private static final double COLLUSION_THRESHOLD = 0.01d;
+
+   /**
+    * Gets a group containing the worker given in argument.
+    */
+    Set<Worker> getGroup(Worker worker) {
+        Set<Worker> currentWorkers = new HashSet<Worker>(this.workers);
+        currentWorkers.removeAll(workers);
+        currentWorkers = Collections.getRandomSubGroup(2, currentWorkers,
+                RandomManager.getRandom("scheduling"));
+        return Collections.addElement(worker, currentWorkers);
+    }
+
+    /**
+     * Gets an extension of the group of workers given in argument (in case
+     * of answers selection failure). Return null if all the known workers
+     * are already in the initial group.
+     */
+    Set<Worker> getGroupExtension(Set<Worker> workers) {
+        if (workers.size() == this.workers.size())
+            return null;
+        Set<Worker> currentWorkers = new HashSet<Worker>(this.workers);
+        currentWorkers.removeAll(workers);
+        Set<Worker> result = new HashSet<Worker>();
+        int size = 0;
+        try {
+            if (gridCharacteristics.getCollusionLikelihood(workers)
+                    > COLLUSION_THRESHOLD)
+                /* Case where the group was found to collude (step 11) */
+                size = 3;
+            else
+                /* Default case for other components than SilST */
+                return Collections.getRandomSubGroup(1, currentWorkers,
+                        RandomManager.getRandom("scheduling"));
+        } catch (TooMuchUncertaintyException e) {
+            /* Case where the group is supected to collude (step 8) */
+            size = 2;
+        }
+        try {
+            /* In both previous cases, we select the best workers */
+            while (result.size() != size) {
+                Set<Worker> worker = Collections.getRandomSubGroup(1,
+                        currentWorkers, RandomManager.getRandom("scheduling"));
+                if (gridCharacteristics.getCollusionLikelihood(worker)
+                        < COLLUSION_THRESHOLD)
+                    result.addAll(worker);
+            }
+        } catch (TooMuchUncertaintyException e) {
+            /* Default case for other components than SilST */
+            return Collections.getRandomSubGroup(1, currentWorkers,
+                    RandomManager.getRandom("scheduling"));
+        }
+        return result;
+    }
+
+}

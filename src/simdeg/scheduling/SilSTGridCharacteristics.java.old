@@ -1,0 +1,240 @@
+package scheduling;
+
+import java.util.Map;
+import java.util.HashMap;
+import java.util.TreeMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Arrays;
+import java.util.logging.Logger;
+import java.lang.Math;
+import java.lang.Double;
+
+/**
+ * Implementation of the sabotage tolerant algorithm of Domingues et al.
+ */
+public class SilSTGridCharacteristics<J extends Job<A>,A extends Answer>
+    extends GridCharacteristics {
+
+    /** Logger */
+    private static final Logger logger
+        = Logger.getLogger(SilSTGridCharacteristics.class.getName());
+
+    /** Number of computed jobs needed for starting to give answers */
+    private static final long MAX_JOB_NUMBER = 10000L;
+
+    /** Number of computed jobs needed for starting to give answers */
+    private static final double MAX_ERROR = 1E-3d;
+
+    /** Keep information concerning executed jobs */
+    private Map<J,Set<Set<Worker>>> workerSetByJob
+        = new HashMap<J,Set<Set<Worker>>>();
+
+    /** Simple data about the collusion of workers */
+    private Map<Worker,Double> collusion = new HashMap<Worker,Double>();
+
+    /** Count the number of left suspected group to be redone */
+    private int leftGroup = -1;
+
+    /** Optimization variable for decreasing the number of iteration required
+     * by the EigenTrust algorithm */
+    private double[] workerScores;
+
+    /**
+     * Gives participating workers.
+     */
+    protected void addAllWorkers(Set<? extends Worker> workers) {
+        super.addAllWorkers(workers);
+        workerScores = new double[this.workers.size()];
+        Arrays.fill(workerScores, 1.0d / workerScores.length);
+    }
+
+     /**
+      * Remove participating workers.
+      */
+    protected void removeAllWorkers(Set<? extends Worker> workers) {
+        super.removeAllWorkers(workers);
+        workerScores = new double[this.workers.size()];
+        Arrays.fill(workerScores, 1.0d / workerScores.length);
+    }
+
+    /**
+     * Basic implementation of the eigenTrust algorithm.
+     */
+    double[] eigenTrust(double[][] measure, double[] initial, double stopping) {
+        assert (measure.length > 0) : "Nothing is measure";
+        assert (measure[0].length == measure.length
+                && initial.length == measure.length) : "Dimension problem";
+        double[] score = Arrays.copyOf(initial, initial.length);
+        double error;
+        do {
+            error = 0.0d;
+            for (int i=0; i<score.length; i++) {
+                double sum = 0.0d;
+                for (int j=0; j<score.length; j++)
+                    sum += measure[j][i] * score[j];
+                error += (score[i] - sum) * (score[i] - sum);
+                score[i] = sum;
+            }
+            error = Math.sqrt(error);
+        } while (error < stopping);
+        return score;
+    }
+
+    /**
+     * Update collusion values with new observation based on the
+     * EigenTrust algorithm (simplification of step 6).
+     */
+    private void computeTrust() {
+        /* Prepare matrix for the EigenTrust algorithm */
+        Worker[] workerArray = workers.toArray(new Worker[0]);
+        Map<Worker,Integer> workerIndex = new HashMap<Worker,Integer>();
+        for (int i=0; i<workerArray.length; i++)
+            workerIndex.put(workerArray[i], i);
+        long[][] agree = new long[workerArray.length][workerArray.length];
+        long[][] disagree = new long[workerArray.length][workerArray.length];
+        for (Worker worker : workers)
+            for (Worker otherWorker : workers) {
+                agree[workerIndex.get(worker)]
+                    [workerIndex.get(otherWorker)] = 0L;
+                disagree[workerIndex.get(worker)]
+                    [workerIndex.get(otherWorker)] = 0L;
+            }
+        // TODO do it iteratively
+        for (Set<Set<Worker>> workerss : workerSetByJob.values())
+            for (Set<Worker> workers : workerss)
+                for (Worker worker : workers)
+                    for (Set<Worker> otherWorkers : workerss)
+                        for (Worker otherWorker : workers)
+                            if (workers == otherWorkers) {
+                                if (worker != otherWorker)
+                                    agree[workerIndex.get(worker)]
+                                        [workerIndex.get(otherWorker)]++;
+                            } else
+                                disagree[workerIndex.get(worker)]
+                                    [workerIndex.get(otherWorker)]++;
+        double[][] measure = new double[workerArray.length][workerArray.length];
+        for (int i=0; i<measure.length; i++)
+            for (int j=0; j<measure[0].length; j++)
+                measure[i][j] = (double)agree[i][j]
+                    / (agree[i][j] + disagree[i][j]);
+        /* Take back the EigenTrust value */
+        workerScores = eigenTrust(measure, workerScores, MAX_ERROR);
+        /* Sort workers by their scores */
+        Map<Double,Worker> sortedWorker = new TreeMap<Double,Worker>();
+        for (int i=0; i<workerScores.length; i++)
+            sortedWorker.put(workerScores[i], workerArray[i]);
+        //TODO
+        // find transition/inflexion point
+        // update collusion
+    }
+
+    /**
+     * Specifies groups of workers giving distinct answers for a job.
+     */
+    @SuppressWarnings("unchecked")
+    <J extends Job<A>, A extends Answer>
+        void setDistinctSet(J job, Set<Set<Worker>> workers) {
+        Map<J,Set<Set<Worker>>> tmp = (Map<J,Set<Set<Worker>>>)workerSetByJob;
+        tmp.put(job, workers);
+        /* Update incrementally collusion measures (do step 6 and 9) */
+        computeTrust();
+        /* Specify that step 6 was completed and set things for step 9 */
+        if (workerSetByJob.size() == MAX_JOB_NUMBER) {
+            /* Set leftGroup by counting supected group */
+            leftGroup = 0;
+            for (Set<Set<Worker>> workerss : workerSetByJob.values())
+                for (Set<Worker> ws : workerss)
+                    try {
+                        if (ws.size() == 1 && getCollusionLikelihood(ws) == 0.0d) {
+                            leftGroup++;
+                            break;
+                        }
+                    } catch (TooMuchUncertaintyException e) {}
+        }
+        /* Count the total size of the current group */
+        int size = 0;
+        for (Set<Worker> ws : workers)
+            size += ws.size();
+        /* In case of a confirmed suspected group */
+        if (size == 5)
+            leftGroup--;
+    }
+
+    /**
+     */
+    public double getReliability(Worker worker) throws TooMuchUncertaintyException {
+        if (workerSetByJob.size() < MAX_JOB_NUMBER)
+            throw new TooMuchUncertaintyException();
+        return collusion.get(worker);
+    }
+
+    /**
+     * Returns the sabotage behavior of any group of workers. If the set size
+     * is 1 and step 6 is done, it returns the likelihood of being a colluders.
+     * If step 9 is done, it returns any other statistics.
+     */
+    public double getCollusionLikelihood(Set<Worker> workers)
+        throws TooMuchUncertaintyException {
+        if (workerSetByJob.size() < MAX_JOB_NUMBER)
+            throw new TooMuchUncertaintyException();
+        if (workers.size() == 1)
+            return collusion.get(workers.iterator().next());
+        if (leftGroup == 0)
+            throw new TooMuchUncertaintyException();
+        double minCollusion = 1.0d;
+        for (Worker worker : workers)
+            minCollusion = Math.min(minCollusion, collusion.get(worker));
+        return minCollusion;
+    }
+
+    /**
+     * Returns the estimated likelihoods that a worker will return the same
+     * wrong answer than each other.
+     */
+    public Map<Worker,Double> getCollusionLikelihood(Worker worker,
+            Set<Worker> workers) {
+        Map<Worker,Double> result = new HashMap<Worker,Double>();
+        for (Worker otherWorker : workers)
+            result.put(otherWorker, 0.0d);
+        return result;
+    }
+
+    /**
+     * Returns the certainty corresponding to the estimated likelihoods
+     * returned by getCollusionLikelihood.
+     */
+    public Map<Worker,Double>
+        getCollusionLikelihoodCertainty(Worker worker, Set<Worker> workers) {
+        Map<Worker,Double> result = new HashMap<Worker,Double>();
+        for (Worker otherWorker : workers)
+            result.put(otherWorker, 1.0d);
+        return result;
+    }
+
+    /**
+     * Returns some fraction of colluders based on the internal values (workers
+     * returning together the same wrong answer). Throws an exception until all
+     * colluders are identified (step 9 is done).
+     */
+    public double getColludersFraction() throws TooMuchUncertaintyException {
+        if (leftGroup == 0)
+            throw new TooMuchUncertaintyException();
+        int colluders = 0;
+        for (Worker worker : workers)
+            if (collusion.get(worker) == 0.0d)
+                colluders++;
+        return (double)colluders / workers.size();
+    }
+
+    /**
+     * Gives a measure of the certainty of the measured estimators. Always 0
+     * until there is enough jobs for starting to give measures (after step 6).
+     */
+    public double getCertainty() {
+        if (workerSetByJob.size() < MAX_JOB_NUMBER)
+            return 0.0d;
+        return 1.0d;
+    }
+
+}
