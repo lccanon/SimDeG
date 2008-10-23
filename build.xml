@@ -14,7 +14,7 @@
   </target>
   <target name="jar" depends="compile">
     <jar destfile="${jar-file}" basedir="${build-dir}"
-         includes="**/*.class">
+         includes="**/*.class" excludes="**/Test*.class">
       <manifest>
         <attribute name="Built-By" value="${user.name}"/>
         <attribute name="Built-Date" value="${today}"/>
@@ -56,8 +56,8 @@
       <batchtest fork="yes" todir="${report-dir}">
         <formatter type="xml"/>
         <fileset dir="${build-dir}">
-          <include name="**/*Test*.class"/>
-          <exclude name="**/*Test*$*.class"/>
+          <include name="**/Test*.class"/>
+          <exclude name="**/Test*$*.class"/>
         </fileset>
       </batchtest>
     </junit>

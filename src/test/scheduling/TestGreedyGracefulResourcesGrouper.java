@@ -19,6 +19,8 @@ import static org.junit.Assert.*;
 
 public class TestGreedyGracefulResourcesGrouper {
 
+    private static final int MIN_GREEDY = 5;
+
     private static Worker worker;
     private static Set<Worker> workerSet;
     private static Set<Worker> workers;
@@ -44,28 +46,29 @@ public class TestGreedyGracefulResourcesGrouper {
     @Test public void getGroupGreedySimple() {
         ReputationSystem gc = new OptimisticGridCharacteristics() {
             public Estimator getColludersFraction() {
-                return new BTS(0.0d, 0.6d);
+                return new BTS(0.0d, 0.2d);
             }
         };
         groupCreator.setReputationSystem(gc);
         Set<Worker> group = groupCreator.getGroup(worker);
         while (group.size() == 1)
             group = groupCreator.getGroup(worker);
-        assertEquals(group.size(), 5);
+        assertEquals(MIN_GREEDY, group.size());
     }
 
     @Test public void getGroupGreedy() {
         ReputationSystem gc = new OptimisticGridCharacteristics() {
             public Estimator getColludersFraction() {
-                return new BTS(0.3d, 0.6d);
+                return new BTS(0.31d, 0.2d);
             }
         };
         groupCreator.setReputationSystem(gc);
         Set<Worker> group = groupCreator.getGroup(worker);
         while (group.size() == 1)
             group = groupCreator.getGroup(worker);
-        assertTrue(group.size() > 5);
-        assertEquals(GreedyGracefulResourcesGrouper.minSize(new BTS(0.3d, 0.6d).getEstimate()), group.size());
+        assertTrue("Greedy groups should be larger :" + group.size(),
+                group.size() >= MIN_GREEDY); 
+        assertEquals(GreedyGracefulResourcesGrouper.minSize(new BTS(0.31d, 0.2d).getEstimate()), group.size());
     }
 
     @Test public void getGroupExtensionSimple() {
@@ -74,7 +77,7 @@ public class TestGreedyGracefulResourcesGrouper {
                     Set<Worker> workers) {
                 Map<Worker,Estimator> result = new HashMap<Worker,Estimator>();
                 for (Worker otherWorker : workers)
-                    result.put(otherWorker, new BTS(0.0d, 0.0d));
+                    result.put(otherWorker, new BTS(0.0d, 1.0d));
                 return result;
             }
         };

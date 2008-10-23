@@ -883,6 +883,9 @@ public class MersenneTwisterFast implements Serializable, Cloneable
 
 
 
+    /**
+     * Returns a gaussian distributed value of mean 0 and variance 1.
+     */
     public final double nextGaussian()
         {
         if (__haveNextNextGaussian)
@@ -1027,11 +1030,59 @@ public class MersenneTwisterFast implements Serializable, Cloneable
             }
         }
 
+    /**
+     * Returns an exponential distributed value with rate lambda.
+     */
     public final double nextExponential(double lambda) {
         return -Math.log(nextDouble()) / lambda;
     }
     
+
+    /**
+     * Returns a beta distributed value with parameters alpha and beta.
+     */
+    public final double nextBeta(double alpha, double beta) {
+        if (alpha <= 0.0d || beta <= 0.0d)
+            throw new IllegalArgumentException("Shape parameters are invalid");
+
+        double alpha1, beta1, gamma;
+        double U1, U2, V, W, X;
+        alpha1 = alpha + beta;
+        if (alpha <= 1. || beta <= 1.)
+            beta1 = ((1./alpha)>(1./beta))?(1./alpha):(1./beta);
+        else
+            beta1 = Math.sqrt ((alpha1-2.) / (2.*alpha*beta - alpha1));
+        gamma = alpha + 1./beta1;
+
+        do {
+            U1 = nextDouble();
+            U2 = nextDouble();
+
+            V = beta1 * Math.log(U1/(1-U1));
+            W = alpha * Math.exp(V);
+        } while (alpha1 * Math.log(alpha1/(beta + W)) + gamma*V - Math.log(4.0d) < Math.log(U1*U1*U2));
+
+        X = W / (beta + W);
+
+        return X;
+    }
     
+
+    /**
+     * Returns a beta distributed value between min and max, and with mean and
+     * standard deviation as specified.
+     */
+    public final double nextBeta(double min, double max, double mean, double stdDev) {
+        final double meanNormalized = (mean - min) / (max - min);
+        final double stdDevNormalized = stdDev / (max - min);
+        if (meanNormalized * (1.0d - meanNormalized) < stdDevNormalized * stdDevNormalized)
+            throw new IllegalArgumentException("Standard deviation specified is too high");
+
+        final double alpha = meanNormalized * (meanNormalized * (1 - meanNormalized)
+                / (stdDevNormalized * stdDevNormalized) - 1.0d);
+        final double beta = alpha / meanNormalized - alpha;
+        return nextBeta(alpha, beta) * (max - min) + min;
+    }
     
     
 

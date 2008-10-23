@@ -32,7 +32,8 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
     /** Minimal probability of not having colluders */
     private static final double MIN_MAJORITY = 0.9d;
 
-    private static final double MIN_CERTAINTY = 0.5d;
+    /** Maximal error allowed when manipulating an estimator */
+    private static final double MAX_ERROR = 1.0d / 3.0d;
 
     /** Precision of the LUT */
     private static final double LUT_PRECISION = 0.01d;
@@ -60,8 +61,8 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
      * Gets a group containing the worker given in argument.
      */
     Set<Worker> getGroup(Worker worker) {
-        if (RandomManager.getRandom("scheduling").nextDouble() > this
-                .reputationSystem.getColludersFraction().getConsistency())
+        if (RandomManager.getRandom("scheduling").nextDouble() < this
+                .reputationSystem.getColludersFraction().getError())
             return getGreedyGroup(worker);
         else
             return getGracefulGroup(worker);
@@ -101,7 +102,7 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
     private int minimumGroupSize() {
         final Estimator fraction
                 = reputationSystem.getColludersFraction();
-            if (fraction.getConsistency() < MIN_CERTAINTY)
+            if (fraction.getError() > MAX_ERROR)
                 throw new RuntimeException();
         return minSizeValues.getValue(fraction.getEstimate());
     }
@@ -157,12 +158,12 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
         double total = 0.0d;
         for (Worker otherWorker : collusion.keySet()) {
             /* If too much collusion are detected, select the unkown worker */
-            if (collusion.get(otherWorker).getConsistency() < MIN_CERTAINTY)
+            if (collusion.get(otherWorker).getError() > MAX_ERROR)
                 return Collections.addElement(otherWorker,
                         new HashSet<Worker>());
             final double currentScore
                 = (1.0d - collusion.get(otherWorker).getEstimate())
-                * collusion.get(otherWorker).getConsistency();
+                * (1.0d - collusion.get(otherWorker).getError());
             score.put(otherWorker, currentScore);
             total += currentScore;
         }

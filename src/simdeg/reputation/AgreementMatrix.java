@@ -31,9 +31,9 @@ class AgreementMatrix {
     private static final double AGREEMENT_THRESHOLD = 0.99d;
 
     /** 
-     * Minimum certainty under which a merge can be done.
-    */
-    private static final double MIN_CERTAINTY = 2.0d / 3.0d;
+     * Maximal error allowed for merging sets.
+     */
+    private static final double MAX_ERROR = 1.0d / 3.0d;
 
     AgreementMatrix(Estimator estimatorBase) {
         this.estimatorBase = estimatorBase;
@@ -65,7 +65,7 @@ class AgreementMatrix {
                     if (set == otherSet)
                         estimator = estimatorBase.clone(1.0d);
                     else
-                        estimator = estimatorBase.clone(0.0d, 0.0d);
+                        estimator = estimatorBase.clone(0.0d, 1.0d);
                 matrix.get(set).put(otherSet, estimator);
             }
     }
@@ -91,24 +91,24 @@ class AgreementMatrix {
         /* Complete existing rows */
         for (Set<Worker> set : matrix.keySet())
             for (Set<Worker> otherSet : sets)
-                matrix.get(set).put(otherSet, estimatorBase.clone(0.0d, 0.0d));
+                matrix.get(set).put(otherSet, estimatorBase.clone(0.0d, 1.0d));
         /* Add and complete last rows */
         addRowsWith(sets);
         biggest = null;
     }
 
     void removeAllWorkers(Set<? extends Worker> workers) {
-        for (Worker worker : workers)
-            reverse.remove(worker);
         for (Set<Worker> set : new HashSet<Set<Worker>>(matrix.keySet())) {
             Set<Worker> newSet = new HashSet<Worker>(set);
             newSet.removeAll(workers);
             if (set.size() != newSet.size()) {
                 copyAgreement(set, newSet);
-                updateReverse(newSet);
                 clean(set);
+                updateReverse(newSet);
             }
         }
+        for (Worker worker : workers)
+            reverse.remove(worker);
         biggest = null;
     }
 
@@ -137,7 +137,7 @@ class AgreementMatrix {
             if (set == newSet)
                 matrix.get(set).put(newSet, estimatorBase.clone(1.0d));
             else if (set == intialSet)
-                matrix.get(set).put(newSet, estimatorBase.clone(0.0d, 0.0d));
+                matrix.get(set).put(newSet, estimatorBase.clone(0.0d, 1.0d));
             else
                 matrix.get(set).put(newSet,
                         matrix.get(set).get(intialSet).clone());
@@ -156,9 +156,9 @@ class AgreementMatrix {
             if (set == newSet)
                 matrix.get(set).put(newSet, estimatorBase.clone(1.0d));
             else if (set == set1 || set == set2)
-                matrix.get(set).put(newSet, estimatorBase.clone(0.0d, 0.0d));
-            else if (matrix.get(set).get(set1).getConsistency()
-                    > matrix.get(set).get(set2).getConsistency())
+                matrix.get(set).put(newSet, estimatorBase.clone(0.0d, 1.0d));
+            else if (matrix.get(set).get(set1).getError()
+                    < matrix.get(set).get(set2).getError())
                 matrix.get(set).put(newSet,
                         matrix.get(set).get(set1).clone());
             else
@@ -193,8 +193,7 @@ class AgreementMatrix {
         /* Test the possibility of merging both sets */
         if (set1 != set2 && matrix.get(set1).get(set2).getEstimate()
                 > AGREEMENT_THRESHOLD
-                && matrix.get(set1).get(set2).getConsistency()
-                > MIN_CERTAINTY) {
+                && matrix.get(set1).get(set2).getError() < MAX_ERROR) {
             logger.finer("Merging of set " + set1 + " and " + set2);
             /* Merge by putting set2 in set1 */
             Set<Worker> merge = new HashSet<Worker>();
@@ -264,10 +263,10 @@ class AgreementMatrix {
         return biggest;
     }
 
-    double getBiggestCertainty() {
+    double getBiggestError() {
         double result = 0.0d;
         for (Set<Worker> set : matrix.keySet())
-            result += matrix.get(getBiggest()).get(set).getConsistency();
+            result += matrix.get(getBiggest()).get(set).getError();
         result /= matrix.keySet().size();
         return result;
     }

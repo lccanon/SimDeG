@@ -22,8 +22,10 @@ public class CollusionAwareResultCertificator extends ResultCertificator {
 	private static final Logger logger = Logger
 			.getLogger(CollusionAwareResultCertificator.class.getName());
 
-	private static final double MIN_CERTAINTY = 0.5d;
+    /** Maximal error allowed when manipulating an estimator */
+	private static final double MAX_ERROR = 1.0d / 3.0d;
 
+    /** Maximal measured collusion of a group before certifying a result */
 	private static final double COLLUSION_THRESHOLD = 0.01d;
 
 	/**
@@ -42,13 +44,13 @@ public class CollusionAwareResultCertificator extends ResultCertificator {
 		Map<R, Set<Worker>> map = ResultCertificator.getJobsByResult(workers,
 				results);
 		double bestRank = 0.0d;
-		R bestAnswer = null;
+		R bestResult = null;
 		/* Store the likelihoods to avoid recomputation */
 		Map<Set<Worker>, Double> colludingLikelihood = new HashMap<Set<Worker>, Double>();
 		for (Set<Worker> group : map.values()) {
 			Estimator estimator = reputationSystem
 					.getCollusionLikelihood(group);
-			if (estimator.getConsistency() < MIN_CERTAINTY)
+			if (estimator.getError() > MAX_ERROR)
 				throw new ResultCertificationException();
 			colludingLikelihood.put(group, estimator.getEstimate());
 		}
@@ -71,21 +73,21 @@ public class CollusionAwareResultCertificator extends ResultCertificator {
 					rank *= colludingLikelihood.get(otherEntry.getValue());
 			}
 			if (rank > bestRank) {
-				bestAnswer = entry.getKey();
+				bestResult = entry.getKey();
 				bestRank = rank;
 			}
 			logger.finer("Rank for result " + entry.getKey() + " is " + rank);
 		}
 
-		if (bestAnswer == null
-				|| colludingLikelihood.get(map.get(bestAnswer)) > COLLUSION_THRESHOLD)
+		if (bestResult == null
+				|| colludingLikelihood.get(map.get(bestResult)) > COLLUSION_THRESHOLD)
 			throw new ResultCertificationException();
 
 		logger.fine("The best rank is " + bestRank + " for a group of "
-				+ map.get(bestAnswer).size() + " workers on a total of "
+				+ map.get(bestResult).size() + " workers on a total of "
 				+ workers.size() + " executed jobs and corresponds to result "
-				+ bestAnswer);
-		return bestAnswer;
+				+ bestResult);
+		return bestResult;
 	}
 
 	/**

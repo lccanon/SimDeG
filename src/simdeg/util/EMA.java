@@ -68,7 +68,7 @@ public class EMA extends Estimator {
     public EMA(double estimate) {
         this(SHORT_TERM_STD_DEV, LONG_TERM_STD_DEV);
         setEstimate(estimate);
-        setConsistency(1.0d);
+        setError(0.0d);
     }
 
     public EMA(double shortTermStdDev, double longTermStdDev) {
@@ -113,10 +113,10 @@ public class EMA extends Estimator {
                 shortTermStdDev, longTermStdDev);
     }
 
-    public EMA clone(double value, double consistency) {
+    public EMA clone(double value, double error) {
         EMA result = new EMA(shortTermEstimate, value,
                 shortTermStdDev, longTermStdDev);
-        result.setConsistency(consistency);
+        result.setError(error);
         return result;
     }
 
@@ -135,16 +135,16 @@ public class EMA extends Estimator {
         longTermEstimate = estimate;
     }
 
-    public double getConsistency() {
-        return getEstimatorsConsistency(abs(shortTermEstimate
+    public double getError() {
+        return 1.0d - getEstimatorsConsistency(abs(shortTermEstimate
                     - longTermEstimate));
         //return getEstimatorsConsistency(shortTermEstimate, longTermEstimate);
     }
 
-    void setConsistency(double consistency) {
+    void setError(double error) {
         //XXX dirty and higly approximate
         shortTermEstimate = longTermEstimate;
-        while (getConsistency() > consistency) {
+        while (getError() < error) {
             if (longTermEstimate < 0.5)
                 shortTermEstimate += 0.1;
             else
@@ -152,8 +152,9 @@ public class EMA extends Estimator {
         }
     }
 
-    public double getConsistencyWith(Estimator estimator) {
-        return Math.min(Math.min(getConsistency(), estimator.getConsistency()),
+    public double getConsistency(Estimator estimator) {
+        return Math.min(Math.min(1.0d - getError(),
+                    1.0d - estimator.getError()),
                 getEstimatorsConsistency(abs(getEstimate()
                         - estimator.getEstimate()),
                     longTermWeight, longTermWeight));

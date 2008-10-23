@@ -155,8 +155,11 @@ class Worker extends simgrid.msg.Process implements simdeg.reputation.Worker {
         if (attackingGroup.get(Msg.getClock()) != null)
             probabilityTotal
                 += attackingGroup.get(Msg.getClock()).getProbability();
+        double maxProbaCollusion = 0.0d;
         for (CollusionGroup buggingGroup : buggingGroups.get(Msg.getClock()))
-            probabilityTotal += buggingGroup.getProbability();
+            maxProbaCollusion = Math.max(maxProbaCollusion,
+                    buggingGroup.getProbability());
+        probabilityTotal += maxProbaCollusion;
         if (probabilityTotal > 1.0d)
             throw new IllegalArgumentException("Specified probabilities are "
                     + probabilityTotal);

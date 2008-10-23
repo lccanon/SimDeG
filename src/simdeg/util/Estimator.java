@@ -12,7 +12,7 @@ public abstract class Estimator {
 
     public abstract Estimator clone(double value);
 
-    public abstract Estimator clone(double value, double consistency);
+    public abstract Estimator clone(double value, double error);
 
     public abstract void setSample(double value);
 
@@ -20,24 +20,25 @@ public abstract class Estimator {
 
     abstract void setEstimate(double estimate);
 
-    public abstract double getConsistency();
+    public abstract double getError();
 
-    abstract void setConsistency(double consistency);
+    abstract void setError(double error);
 
-    public abstract double getConsistencyWith(Estimator estimator);
+    public abstract double getConsistency(Estimator estimator);
 
     public static Estimator inverse(Estimator estimator) {
         return estimator.clone().inverse();
     }
 
     public Estimator inverse() {
-        final double consistency = getConsistency();
+        final double error = getError();
         setEstimate(-getEstimate());
-        setConsistency(consistency);
+        setError(error);
         return this;
     }
 
     public static Estimator max(Estimator v1, Estimator v2) {
+        System.out.println(v1 + " " + v2);
         if (v1.getEstimate() > v2.getEstimate())
             return v1.clone();
         else
@@ -52,9 +53,10 @@ public abstract class Estimator {
         return v1.clone().add(v2);
     }
 
+    //XXX try with weights
     public Estimator add(Estimator estimator) {
         setEstimate(estimator.getEstimate() + getEstimate());
-        setConsistency((estimator.getConsistency() + getConsistency()) / 2.0d);
+        setError((estimator.getError() + getError()) / 2.0d);
         return this;
     }
 
@@ -81,13 +83,13 @@ public abstract class Estimator {
         double numinator = 0.0d;
         double denominator = 0.0d;
         for (Estimator estimator : estimators) {
-            final double consistency = estimator.getConsistency();
-            numinator += consistency * estimator.getEstimate();
-            denominator += consistency;
+            final double error = estimator.getError();
+            numinator += (1.0d - error) * estimator.getEstimate();
+            denominator += (1.0d - error);
         }
         final Estimator result = estimators.iterator().next().clone();
         result.setEstimate(numinator/denominator);
-        result.setConsistency(denominator/estimators.size());
+        result.setError(1.0d - denominator/estimators.size());
         return result;
     }
 
@@ -95,7 +97,7 @@ public abstract class Estimator {
         DecimalFormat df = new DecimalFormat("0.##",
                 new DecimalFormatSymbols(Locale.ENGLISH));
         return "{" + df.format(getEstimate()) + ","
-            + df.format(getConsistency()) + "}";
+            + df.format(getError()) + "}";
     }
 
 }

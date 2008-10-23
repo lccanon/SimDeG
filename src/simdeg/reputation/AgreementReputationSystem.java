@@ -152,8 +152,7 @@ public class AgreementReputationSystem extends ReliableReputationSystem {
 	public Estimator getColludersFraction() {
 		final Set<Worker> biggest = agreement.getBiggest();
 		final double fraction = 1.0d - (double) biggest.size() / workers.size();
-		final Estimator result = new BTS(fraction, agreement
-				.getBiggestCertainty());
+		final Estimator result = new BTS(fraction, agreement.getBiggestError());
 		logger.finer("Estimated fraction of colluders: " + result);
 		return result;
 	}
