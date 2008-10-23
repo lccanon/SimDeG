@@ -11,6 +11,7 @@ import java.util.logging.Logger;
 
 import simdeg.reputation.ReputationSystem;
 import simdeg.util.Switcher;
+import simdeg.util.Estimator;
 
 /**
  * Accomplish the evaluation of a reputation system based on some
@@ -22,11 +23,56 @@ class Evaluator {
     private static final Logger logger
         = Logger.getLogger(Evaluator.class.getName());
 
+    private static final double EPSILON = 1E-15;
+
     /** Pool of workers which are simulated */
     private Set<Worker> workers = null;
 
     /** Reputation system being tested */
     private ReputationSystem reputationSystem = null;
+
+    /** Total number of step */
+    private int stepsNumber;
+
+    /** True switching steps */
+    private int reliabilitySwitchStep, buggingSwitchStep;
+
+    /** Workers true reliability */
+    private Map<Worker,Switcher<Double>> reliability
+        = new HashMap<Worker,Switcher<Double>>();
+
+    /** Workers true bugging groups */
+    private Map<Worker,Switcher<Set<CollusionGroup>>> bugging
+        = new HashMap<Worker,Switcher<Set<CollusionGroup>>>();
+
+    /** Root mean squared deviation for collusion, reliability and fraction */
+    private double[] RMSDc, RMSDr, RMSDa;
+
+    /**
+     * Root mean squared deviation for collusion, reliability and fraction errors
+     */
+    private double[] RMSDec, RMSDer, RMSDea;
+
+    /** Correlation between true and estimated errors */
+    private double[] corrEc, corrEr;
+
+    /** Number of false negative */
+    private int[] falseNegativeC, falseNegativeR, falseNegativeA;
+
+    /** Length of adapation part */
+    private int adaptationLengthC = 0, adaptationLengthR = 0, adaptationLengthA = 0;
+
+    /** Smooth metric */
+    private double[] smoothC, smoothR, smoothA;
+
+    /** Current and previous estimated collusion matrix */
+    private Map<Worker, Map<Worker, Double>> estimatedBugging, previousBugging, errorBugging;
+
+    /** Current and previous estimated reliability */
+    private Map<Worker, Double> estimatedReliability, previousReliability, errorReliability;
+
+    /** Current and previous estimated fraction of colluders */
+    private double estimatedFraction, previousFraction, errorFraction;
 
     /**
      * Constructor specifying the measured reputation system.
@@ -35,15 +81,28 @@ class Evaluator {
         this.reputationSystem = reputationSystem;
     }
 
-    /** Workers reliability */
-    private Map<Worker,Switcher<Double>> reliability
-        = new HashMap<Worker,Switcher<Double>>();
+    protected void setSteps(int stepsNumber, int reliabilitySwitchStep,
+            int buggingSwitchStep) {
+        this.stepsNumber = stepsNumber;
+        this.reliabilitySwitchStep = reliabilitySwitchStep;
+        this.buggingSwitchStep = buggingSwitchStep;
+        RMSDc = new double[stepsNumber];
+        RMSDr = new double[stepsNumber];
+        RMSDa = new double[stepsNumber];
+        RMSDec = new double[stepsNumber];
+        RMSDer = new double[stepsNumber];
+        RMSDea = new double[stepsNumber];
+        corrEc = new double[stepsNumber];
+        corrEr = new double[stepsNumber];
+        falseNegativeC = new int[stepsNumber];
+        falseNegativeR = new int[stepsNumber];
+        falseNegativeA = new int[stepsNumber];
+        smoothC = new double[stepsNumber];
+        smoothR = new double[stepsNumber];
+        smoothA = new double[stepsNumber];
+    }
 
-    /** Workers bugging groups */
-    private Map<Worker,Switcher<Set<CollusionGroup>>> bugging
-        = new HashMap<Worker,Switcher<Set<CollusionGroup>>>();
-
-     /**
+    /**
      * Constructs internal reliability and collusion matrices.
      */
     protected void setWorkersFaultiness(
@@ -63,36 +122,236 @@ class Evaluator {
         bugging.putAll(buggingGroups);
     }
 
-    private double computeColludersFraction(int step) {
-        /* Keep track of colluder fraction */
-        int colluders = 0;
-        for (Worker worker : workers)
-            if (!bugging.get(worker).get(step).isEmpty())
-                colluders++;
-        return (double)colluders / workers.size();
+    /**
+     * Notifies the progress of the simulation.
+     */
+    protected void setStep(int step) {
+        if (step < 0 || step >= stepsNumber)
+            throw new IllegalArgumentException("Steps are outside expectation");
+
+        if (step == 0)
+            logger.info("Step,collusion RMSD,reliability RMSD,fraction RMSD,"
+                    + "collusion error RMSD,reliability error RMSD,"
+                    + "fraction error RMSD, collusion error correlation,"
+                    + "reliability error correlation,collusion false negative,"
+                    + "reliability false negative,fraction false negative,"
+                    + "collusion smoothness,reliability smoothness,fraction smoothness");
+
+        /* Retrieve the values from the reputation system */
+        getEstimatedValues();
+
+        /* Compute main metrics related to accuracy */
+        computeErrorsCollusion(step);
+        computeErrorsReliability(step);
+        computeErrorsFraction(step);
+
+        /* Measures the adaptiveness quality of the system */
+        measureAdaptiveness(step);
+
+        /* Handles the smothness metric */
+        measureSmoothness(step);
+        previousBugging = estimatedBugging;
+        previousReliability = estimatedReliability;
+        previousFraction = estimatedFraction;
+
+        logger.info(String.format("%d,%12g,%12g,%12g,%12g,%12g,%12g,"
+                    + "%12g,%12g,%d,%d,%d,%12g,%12g,%12g", step,
+                    RMSDc[step], RMSDr[step], RMSDa[step], RMSDec[step],
+                    RMSDer[step], RMSDea[step], corrEc[step], corrEr[step],
+                    falseNegativeC[step], falseNegativeR[step],
+                    falseNegativeA[step], smoothC[step], smoothR[step],
+                    smoothA[step]));
+
+        if (step + 1 == stepsNumber) {
+            logger.info("collusion adaptation length,"
+                    + "reliability adaptation length,fraction adaptation length");
+            logger.info(String.format("%d,%d,%d", adaptationLengthC,
+                        adaptationLengthR, adaptationLengthA));
+        }
     }
 
     /**
-     * Returns the precision of the estimation of the fraction of colluders.
+     * Retrieves estimation from the reputation system at a given step.
      */
-    private double getColludersFractionError(int step) {
-        final double colludersFraction = computeColludersFraction(step);
-        return abs(reputationSystem.getColludersFraction().getEstimate() - colludersFraction);
+    private void getEstimatedValues() {
+        estimatedBugging = new HashMap<Worker, Map<Worker, Double>>();
+        errorBugging = new HashMap<Worker, Map<Worker, Double>>();
+        for (Worker worker1 : workers) {
+            Map<Worker, Estimator> row = reputationSystem.getCollusionLikelihood(worker1, workers);
+            estimatedBugging.put(worker1, new HashMap<Worker, Double>());
+            errorBugging.put(worker1, new HashMap<Worker, Double>());
+            for (Worker worker2 : workers) {
+                estimatedBugging.get(worker1).put(worker2, row.get(worker2).getEstimate());
+                errorBugging.get(worker1).put(worker2, row.get(worker2).getError());
+            }
+        }
+        estimatedReliability = new HashMap<Worker, Double>();
+        errorReliability = new HashMap<Worker, Double>();
+        for (Worker worker : workers) {
+            estimatedReliability.put(worker, reputationSystem.getReliability(worker).getEstimate());
+            errorReliability.put(worker, reputationSystem.getReliability(worker).getError());
+        }
+        estimatedFraction = reputationSystem.getColludersFraction().getEstimate();
+        errorFraction = reputationSystem.getColludersFraction().getError();
     }
 
     /**
-     * Returns the mean absolute error of the estimated reliability vector.
-     * Can be misleading when large groups are created at the end because
-     * every success will be detected soon and every failure will be notified
-     * only when the group is entirely finished. Then it biases the estimators
-     * at the very end.
+     * Computes metrics related to accuracy and introspection (RMSD,
+     * correlation, and false negative) based on comparing estimatedBugging matrix
+     * and the computed true value from bugging data structure (for collusion).
      */
-    private double getReliabilityError(int step) {
-        double error = 0.0d;
-        for (Worker worker : workers)
-            error += abs(reputationSystem.getReliability(worker).getEstimate()
-                    - reliability.get(worker).get(step));
-        return error / workers.size();
+    private void computeErrorsCollusion(int step) {
+        RMSDc[step] = 0.0d;
+        falseNegativeC[step] = 0;
+        RMSDec[step] = 0.0d;
+        double meanError = 0.0d, meanError2 = 0.0d, meanEstimatedError = 0.0d,
+               meanEstimatedError2 = 0.0d, meanProd = 0.0d;
+        Map<Worker, Map<Worker, Double>> trueBugging = computeCollusion(step);
+        for (Worker worker1 : workers)
+            for (Worker worker2 : workers) {
+                final double estimation = estimatedBugging.get(worker1).get(worker2);
+                final double proba = trueBugging.get(worker1).get(worker2);
+                final double error = Math.abs(estimation - proba);
+                final double estimatedError = errorBugging.get(worker1).get(worker2);
+                RMSDc[step] += error * error;
+                RMSDec[step] += (error - estimatedError) * (error - estimatedError);
+                if (error > estimatedError)
+                    falseNegativeC[step]++;
+                meanError += error;
+                meanError2 += error * error;
+                meanEstimatedError += estimatedError;
+                meanEstimatedError2 += estimatedError * estimatedError;
+                meanProd += error * estimatedError;
+            }
+        meanError /= workers.size() * workers.size();
+        meanError2 /= workers.size() * workers.size();
+        meanEstimatedError /= workers.size() * workers.size();
+        meanEstimatedError2 /= workers.size() * workers.size();
+        meanProd /= workers.size() * workers.size();
+        if (Math.abs(meanError2 - meanError * meanError) < EPSILON
+                || Math.abs(meanEstimatedError2 - meanEstimatedError * meanEstimatedError) < EPSILON)
+            corrEc[step] = 0.0d;
+        else
+            corrEc[step] = (meanProd - meanError * meanEstimatedError)
+                / Math.sqrt((meanError2 - meanError * meanError)
+                        * (meanEstimatedError2 - meanEstimatedError * meanEstimatedError));
+        RMSDc[step] = Math.sqrt(RMSDc[step] / (workers.size() * workers.size()));
+        RMSDec[step] = Math.sqrt(RMSDec[step] / (workers.size() * workers.size()));
+    }
+
+    /**
+     * Computes metrics related to accuracy and introspection (RMSD,
+     * correlation, and false negative) based on comparing estimatedReliability array
+     * and the computed true value from reliability data structure.
+     */
+    private void computeErrorsReliability(int step) {
+        RMSDr[step] = 0.0d;
+        falseNegativeR[step] = 0;
+        RMSDer[step] = 0.0d;
+        double meanError = 0.0d, meanError2 = 0.0d, meanEstimatedError = 0.0d,
+               meanEstimatedError2 = 0.0d, meanProd = 0.0d;
+        for (Worker worker : workers) {
+            final double estimation = estimatedReliability.get(worker);
+            final double proba = reliability.get(worker).get(step);
+            final double error = Math.abs(estimation - proba);
+            final double estimatedError = errorReliability.get(worker);
+            RMSDr[step] += error * error;
+            RMSDer[step] += (error - estimatedError) * (error - estimatedError);
+            if (error > estimatedError)
+                falseNegativeR[step]++;
+            meanError += error;
+            meanError2 += error * error;
+            meanEstimatedError += estimatedError;
+            meanEstimatedError2 += estimatedError * estimatedError;
+            meanProd += error * estimatedError;
+        }
+        meanError /= workers.size();
+        meanError2 /= workers.size();
+        meanEstimatedError /= workers.size();
+        meanEstimatedError2 /= workers.size();
+        meanProd /= workers.size();
+        if (Math.abs(meanError2 - meanError * meanError) < EPSILON
+                || Math.abs(meanEstimatedError2 - meanEstimatedError * meanEstimatedError) < EPSILON)
+            corrEr[step] = 0.0d;
+        else
+            corrEr[step] = (meanProd - meanError * meanEstimatedError)
+                / Math.sqrt((meanError2 - meanError * meanError)
+                        * (meanEstimatedError2 - meanEstimatedError * meanEstimatedError));
+        RMSDr[step] = Math.sqrt(RMSDr[step] / workers.size());
+        RMSDer[step] = Math.sqrt(RMSDer[step] / workers.size());
+    }
+
+    /**
+     * Computes metrics related to accuracy and introspection (RMSD,
+     * correlation, and false negative) based on comparing estimatedFraction value
+     * and the computed true value.
+     */
+    private void computeErrorsFraction(int step) {
+        final double proba = computeColludersFraction(step);
+        final double error = Math.abs(estimatedFraction - proba);
+        final double estimatedError = errorFraction;
+        RMSDa[step] = Math.abs(error);
+        RMSDea[step] = Math.abs(error - estimatedError);
+        if (error > estimatedError)
+            falseNegativeA[step]++;
+    }
+
+    /** Optimization variables for adaptiveness */
+    private double meanRMSDc = 0.0d, meanRMSDr = 0.0d, meanRMSDa = 0.0d;
+
+    /**
+     * Measures the adaptiveness metrics, namely the steps required to
+     * estimated new situation.
+     */
+    private void measureAdaptiveness(int step) {
+        /* Collusion case */
+        if (step == buggingSwitchStep) {
+            for (int i=0; i<step; i++)
+                meanRMSDc += RMSDc[i];
+            meanRMSDc /= step;
+        } else if (step > buggingSwitchStep && adaptationLengthC == 0) {
+            if (RMSDc[step] <= meanRMSDc)
+                adaptationLengthC = step - buggingSwitchStep;
+        }
+        /* Reliability */
+        if (step == reliabilitySwitchStep) {
+            for (int i=0; i<step; i++)
+                meanRMSDr += RMSDr[i];
+            meanRMSDr /= step;
+        } else if (step > reliabilitySwitchStep && adaptationLengthR == 0) {
+            if (RMSDr[step] <= meanRMSDr)
+                adaptationLengthR = step - reliabilitySwitchStep;
+        }
+        /* Fraction */
+        if (step == buggingSwitchStep) {
+            for (int i=0; i<step; i++)
+                meanRMSDa += RMSDa[i];
+            meanRMSDa /= step;
+        } else if (step > buggingSwitchStep && adaptationLengthA == 0) {
+            if (RMSDa[step] <= meanRMSDa)
+                adaptationLengthA = step - buggingSwitchStep;
+        }
+    }
+
+    private void measureSmoothness(int step) {
+        if (step == 0)
+            return;
+        /* Collusion case */
+        smoothC[step] = 0.0d;
+        for (Worker worker1 : workers)
+            for (Worker worker2 : workers) {
+                final double old = previousBugging.get(worker1).get(worker2);
+                final double current = estimatedBugging.get(worker1).get(worker2);
+                smoothC[step] += Math.abs(old - current);
+            }
+        /* Reliability */
+        for (Worker worker : workers) {
+            final double old = previousReliability.get(worker);
+            final double current = estimatedReliability.get(worker);
+            smoothR[step] += Math.abs(old - current);
+        }
+        /* Fraction */
+        smoothA[step] = Math.abs(previousFraction - estimatedFraction);
     }
 
     private Map<Worker,Map<Worker,Double>> computeCollusion(int step) {
@@ -124,47 +383,15 @@ class Evaluator {
     }
 
     /**
-     * Returns the root mean squares deviation of the estimated collusion matrix.
+     * Computes the precision of the estimation of the fraction of colluders.
      */
-    private double getCollusionRMSD(int step) {
-        final Map<Worker,Map<Worker,Double>> collusion = computeCollusion(step);
-        double total = 0.0d;
-        for (Worker worker1 : workers)
-            for (Worker worker2 : workers) {
-                Set<simdeg.reputation.Worker> pair = new HashSet<simdeg.reputation.Worker>();
-                pair.add(worker1);
-                pair.add(worker2);
-                double error = reputationSystem.getCollusionLikelihood(pair).getEstimate()
-                    - collusion.get(worker1).get(worker2);
-                total += error * error;
-            }
-        return Math.sqrt(total / workers.size() / workers.size());
-    }
-
-    /**
-     * Notifies the progress of the simulation.
-     */
-    protected void setStep(int step) {
-        if (step == 0)
-            logger.info(getPerformanceHeader());
-        logger.info(getPerformanceMeasures(step));
-    }
-
-    /**
-     * Returns the header of measures.
-     */
-    private String getPerformanceHeader() {
-        return "Col.fraction, Reliability,   Collusion";
-    }
-
-    /**
-     * Returns a String summarizing the measures.
-     */
-    private String getPerformanceMeasures(int step) {
-        String result = String.format("%12g,%12g,%12g",
-                    getColludersFractionError(step), getReliabilityError(step),
-                    getCollusionError(step));
-        return result;
+    private double computeColludersFraction(int step) {
+        /* Keep track of colluder fraction */
+        int colluders = 0;
+        for (Worker worker : workers)
+            if (!bugging.get(worker).get(step).isEmpty())
+                colluders++;
+        return (double)colluders / workers.size();
     }
 
 }

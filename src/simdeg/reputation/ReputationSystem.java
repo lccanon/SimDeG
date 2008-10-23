@@ -50,14 +50,14 @@ public abstract class ReputationSystem {
 	 * Returns the estimated likelihood that a given group of workers give the
 	 * same wrong result.
 	 */
-	public abstract Estimator getCollusionLikelihood(Set<Worker> workers);
+	public abstract Estimator getCollusionLikelihood(Set<? extends Worker> workers);
 
 	/**
 	 * Returns the estimated likelihoods that a worker will return the same
 	 * wrong result than each other.
 	 */
-	public abstract Map<Worker, Estimator> getCollusionLikelihood(
-			Worker worker, Set<Worker> workers);
+	public abstract <W extends Worker> Map<W, Estimator> getCollusionLikelihood(
+			W worker, Set<W> workers);
 
 	/**
 	 * Returns the estimated fraction of colluders (workers returning together

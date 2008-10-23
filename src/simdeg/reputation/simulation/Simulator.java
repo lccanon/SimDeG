@@ -55,8 +55,8 @@ class Simulator {
     private static double reliabilityProbability1 = 0.0d;
     private static double reliabilityWorkersFraction2 = 0.0d;
     private static double reliabilityProbability2 = 0.0d;
-    private static double reliabilitySwitchTime = 0.0d;
-    private static double reliabilitySwitchSpeed = 0.0d;
+    private static int reliabilitySwitchStep = 0;
+    private static int reliabilitySwitchSpeed = 0;
     private static double reliabilityPropagationRate = 0.0d;
 
     private static int buggingGroupNumber1 = 0;
@@ -65,8 +65,8 @@ class Simulator {
     private static int buggingGroupNumber2 = 0;
     private static List<Double> buggingWorkersFraction2 = null;
     private static List<Double> buggingJobsFraction2 = null;
-    private static double buggingSwitchTime = 0.0d;
-    private static double buggingSwitchSpeed = 0.0d;
+    private static int buggingSwitchStep = 0;
+    private static int buggingSwitchSpeed = 0;
     private static double buggingPropagationRate = 0.0d;
 
     private static enum Parameter {
@@ -74,26 +74,26 @@ class Simulator {
         StepsNumber, WorkersNumber, ResultArrivalHeterogeneity, ResultArrivalSeed,
         ReliabilityWorkersFraction1, ReliabilityProbability1,
         ReliabilityWorkersFraction2, ReliabilityProbability2,
-        ReliabilitySwitchTime, ReliabilitySwitchSpeed,
+        ReliabilitySwitchStep, ReliabilitySwitchSpeed,
         ReliabilityPropagationRate, ReliabilitySeed,
         BuggingGroupNumber1, BuggingWorkersFraction1, BuggingJobsFraction1,
         BuggingGroupNumber2, BuggingWorkersFraction2, BuggingJobsFraction2,
-        BuggingSwitchTime, BuggingSwitchSpeed, BuggingPropagationRate,
+        BuggingSwitchStep, BuggingSwitchSpeed, BuggingPropagationRate,
         BuggingSeed;
     }
 
     @SuppressWarnings("unchecked")
     private static void addParameter(String name, String value) {
         switch (Parameter.valueOf(name)) {
-            case StepsNumber: case WorkersNumber: case BuggingGroupNumber1:
-            case BuggingGroupNumber2:
+            case StepsNumber: case WorkersNumber: case ReliabilitySwitchStep:
+            case ReliabilitySwitchSpeed: case BuggingGroupNumber1:
+            case BuggingGroupNumber2: case BuggingSwitchStep:
+            case BuggingSwitchSpeed:
                 if (Integer.valueOf(value) < 0)
                     throw new IllegalArgumentException(value + " is negative");
             case ResultArrivalHeterogeneity: case ReliabilityWorkersFraction1:
             case ReliabilityProbability1: case ReliabilityWorkersFraction2:
-            case ReliabilityProbability2: case ReliabilitySwitchTime:
-            case ReliabilitySwitchSpeed: case ReliabilityPropagationRate:
-            case BuggingSwitchTime: case BuggingSwitchSpeed:
+            case ReliabilityProbability2: case ReliabilityPropagationRate:
             case BuggingPropagationRate:
                 if (Double.valueOf(value) < 0)
                     throw new IllegalArgumentException(value + " is negative");
@@ -140,11 +140,11 @@ class Simulator {
                 case ReliabilityProbability2:
                     reliabilityProbability2 = Double.valueOf(value);
                     break;
-                case ReliabilitySwitchTime:
-                    reliabilitySwitchTime = Double.valueOf(value);
+                case ReliabilitySwitchStep:
+                    reliabilitySwitchStep = Integer.valueOf(value);
                     break;
                 case ReliabilitySwitchSpeed:
-                    reliabilitySwitchSpeed = Double.valueOf(value);
+                    reliabilitySwitchSpeed = Integer.valueOf(value);
                     break;
                 case ReliabilityPropagationRate:
                     reliabilityPropagationRate = Double.valueOf(value);
@@ -170,11 +170,11 @@ class Simulator {
                 case BuggingJobsFraction2:
                     buggingJobsFraction2 = parseList(Double.class, value);
                     break;
-                case BuggingSwitchTime:
-                    buggingSwitchTime = Double.valueOf(value);
+                case BuggingSwitchStep:
+                    buggingSwitchStep = Integer.valueOf(value);
                     break;
                 case BuggingSwitchSpeed:
-                    buggingSwitchSpeed = Double.valueOf(value);
+                    buggingSwitchSpeed = Integer.valueOf(value);
                     break;
                 case BuggingPropagationRate:
                     buggingPropagationRate = Double.valueOf(value);
@@ -264,7 +264,7 @@ class Simulator {
             final Double offset = getRandomSubGroup(1, startTimes,
                     RandomManager.getRandom("reliability")).iterator().next();
             startTimes.remove(offset);
-            final double start = reliabilitySwitchTime + offset;
+            final double start = reliabilitySwitchStep + offset;
             final double end = start + 1.0d / reliabilitySwitchSpeed;
             switchers.add(new Switcher<Double>(switcher, start, end));
         }
@@ -330,7 +330,7 @@ class Simulator {
             final Double offset = getRandomSubGroup(1, startTimes,
                     RandomManager.getRandom("bugging")).iterator().next();
             startTimes.remove(offset);
-            final double start = buggingSwitchTime + offset;
+            final double start = buggingSwitchStep + offset;
             final double end = start + 1.0d / buggingSwitchSpeed;
             switchers.add(new Switcher<Set<CollusionGroup>>(switcher, start, end));
         }
@@ -396,12 +396,14 @@ class Simulator {
 
         /* Initialize the evaluation of the reputation system */
         Evaluator evaluator = new Evaluator(reputationSystem);
+        evaluator.setSteps(stepsNumber, reliabilitySwitchStep,
+                buggingSwitchStep);
 
         /* Set the platform characteristics */
         Set<Worker> workers = initializeWorkers(evaluator);
 
+        /* Prepare the scheduler */
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
-
         scheduler.addAllWorkers(workers);
 
         /* Launch the simulation */

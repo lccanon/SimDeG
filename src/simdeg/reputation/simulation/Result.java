@@ -9,7 +9,7 @@ import java.util.HashSet;
  */
 class Result implements simdeg.reputation.Result {
 
-    enum ResultType {ATTACK, FAILED, BUG, CORRECT, LAST};
+    enum ResultType {BUG, FAILED, CORRECT};
 
     private ResultType type;
 

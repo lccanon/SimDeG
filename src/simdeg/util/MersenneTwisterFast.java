@@ -1076,7 +1076,7 @@ public class MersenneTwisterFast implements Serializable, Cloneable
         final double meanNormalized = (mean - min) / (max - min);
         final double stdDevNormalized = stdDev / (max - min);
         if (meanNormalized * (1.0d - meanNormalized) < stdDevNormalized * stdDevNormalized)
-            throw new IllegalArgumentException("Standard deviation specified is too high");
+            throw new IllegalArgumentException("Standard deviation " + stdDev + " is too high");
 
         final double alpha = meanNormalized * (meanNormalized * (1 - meanNormalized)
                 / (stdDevNormalized * stdDevNormalized) - 1.0d);

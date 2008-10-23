@@ -73,10 +73,10 @@ public class TestGreedyGracefulResourcesGrouper {
 
     @Test public void getGroupExtensionSimple() {
         ReputationSystem gc = new OptimisticGridCharacteristics() {
-            public Map<Worker,Estimator> getCollusionLikelihood(Worker worker,
-                    Set<Worker> workers) {
-                Map<Worker,Estimator> result = new HashMap<Worker,Estimator>();
-                for (Worker otherWorker : workers)
+            public <W extends Worker> Map<W,Estimator> getCollusionLikelihood(W worker,
+                    Set<W> workers) {
+                Map<W,Estimator> result = new HashMap<W,Estimator>();
+                for (W otherWorker : workers)
                     result.put(otherWorker, new BTS(0.0d, 1.0d));
                 return result;
             }
@@ -88,10 +88,10 @@ public class TestGreedyGracefulResourcesGrouper {
 
     @Test public void getGroupExtension() {
         ReputationSystem gc = new OptimisticGridCharacteristics() {
-            public Map<Worker,Estimator> getCollusionLikelihood(Worker worker,
-                    Set<Worker> workers) {
-                Map<Worker,Estimator> result = new HashMap<Worker,Estimator>();
-                for (Worker otherWorker : workers)
+            public <W extends Worker> Map<W,Estimator> getCollusionLikelihood(W worker,
+                    Set<W> workers) {
+                Map<W,Estimator> result = new HashMap<W,Estimator>();
+                for (W otherWorker : workers)
                     result.put(otherWorker, new BTS(1.0d));
                 result.put(workers.iterator().next(), new BTS(0.0d));
                 return result;

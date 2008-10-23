@@ -10,7 +10,9 @@
   </tstamp>
   <target name="compile">
     <mkdir dir="${build-dir}"/>
-    <javac srcdir="${src-dir}" destdir="${build-dir}" debug="yes"/>
+    <javac srcdir="${src-dir}" destdir="${build-dir}" debug="yes">
+      <compilerarg value="-Xlint"/>
+    </javac>
   </target>
   <target name="jar" depends="compile">
     <jar destfile="${jar-file}" basedir="${build-dir}"
@@ -23,16 +25,9 @@
       </manifest>
       <fileset dir="${src-dir}">
         <include name="**/*.java"/>
+        <exclude name="**/Test*.java"/>
       </fileset>
     </jar>
-  </target>
-  <target name="run" depends="jar">
-    <java classname="${main-class}"
-          classpath="${jar-file}"
-          fork="true">
-      <jvmarg line="-ea -Djava.util.logging.config.file=property/logging.properties"/>
-      <arg file="example.txt"/>
-    </java>
   </target>
   <target name="SimDeG" depends="jar,doc,test">
     <echo message="SimDeG build file"/>
@@ -51,7 +46,7 @@
     <junit printsummary="yes" haltonfailure="no" fork="true">
       <jvmarg line="-ea"/>
       <classpath>
-        <pathelement location="${jar-file}"/>
+        <pathelement location="${build-dir}"/>
       </classpath>
       <batchtest fork="yes" todir="${report-dir}">
         <formatter type="xml"/>

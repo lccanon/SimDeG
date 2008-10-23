@@ -107,7 +107,7 @@ public class AgreementReputationSystem extends ReliableReputationSystem {
 	 * Returns the estimated likelihood that a given group of workers give the
 	 * same result.
 	 */
-	public Estimator getCollusionLikelihood(Set<Worker> workers) {
+	public Estimator getCollusionLikelihood(Set<? extends Worker> workers) {
 		final Estimator[][] proba = agreement.getCollusion(workers);
 		final Estimator one = new BTS(1.0d);
 		Estimator estimator = new BTS(1.0d);
@@ -131,11 +131,11 @@ public class AgreementReputationSystem extends ReliableReputationSystem {
 	 * Returns the estimated likelihoods that a worker will return the same
 	 * wrong result than each other.
 	 */
-	public Map<Worker, Estimator> getCollusionLikelihood(Worker worker,
-			Set<Worker> workers) {
-		Map<Worker, Estimator> result = new HashMap<Worker, Estimator>();
-		Set<Worker> set = addElement(worker, new HashSet<Worker>());
-		for (Worker otherWorker : workers) {
+	public <W extends Worker> Map<W, Estimator> getCollusionLikelihood(W worker,
+			Set<W> workers) {
+		Map<W, Estimator> result = new HashMap<W, Estimator>();
+		Set<W> set = addElement(worker, new HashSet<W>());
+		for (W otherWorker : workers) {
 			set.add(otherWorker);
 			result.put(otherWorker, getCollusionLikelihood(set));
 			set.remove(otherWorker);
@@ -156,5 +156,9 @@ public class AgreementReputationSystem extends ReliableReputationSystem {
 		logger.finer("Estimated fraction of colluders: " + result);
 		return result;
 	}
+
+    public String toString() {
+        return "agreement-based reputation system";
+    }
 
 }

@@ -246,7 +246,7 @@ class AgreementMatrix {
     }
 
     @SuppressWarnings("unchecked")
-    Estimator[][] getCollusion(Set<Worker> workers) {
+    Estimator[][] getCollusion(Set<? extends Worker> workers) {
         List<Set<Worker>> sets = new ArrayList<Set<Worker>>(getSets(workers));
         Estimator[][] result = new Estimator[sets.size()][sets.size()];
         for (int j=0; j<result[0].length; j++)

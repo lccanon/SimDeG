@@ -68,9 +68,10 @@ class Worker implements simdeg.reputation.Worker {
      * Checks internaly if the specified probabilities are achievables.
      */
     private void checkProbabilities() {
-        double probabilityCollusion = 1.0d;
+        double probabilityCollusion = 0.0d;
         for (CollusionGroup buggingGroup : buggingGroups.get(0.0d))
-            probabilityCollusion *= buggingGroup.getProbability();
+            probabilityCollusion = (1.0d - probabilityCollusion)
+                * buggingGroup.getProbability() + probabilityCollusion;
         if (probabilityCollusion > reliability.get(0.0d))
             throw new IllegalArgumentException("Collusion probability are too high");
     }

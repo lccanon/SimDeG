@@ -55,7 +55,7 @@ public class TestCollusionAwareResultCertificator {
     @SuppressWarnings("unchecked")
     @Test public void selectBestAnswer() throws ResultCertificationException {
         ReputationSystem gc = new OptimisticGridCharacteristics() {
-            public Estimator getCollusionLikelihood(Set<Worker> workers) {
+            public Estimator getCollusionLikelihood(Set<? extends Worker> workers) {
                 if (workers.size() == 6)
                     return new BTS(0.5d);
                 else

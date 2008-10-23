@@ -37,7 +37,7 @@ public class OptimisticGridCharacteristics extends ReputationSystem {
      * Returns a zero likelihood that any given group of workers give the
      * same wrong result.
      */
-    public Estimator getCollusionLikelihood(Set<Worker> workers) {
+    public Estimator getCollusionLikelihood(Set<? extends Worker> workers) {
         return new BTS(0.0d);
     }
 
@@ -45,10 +45,10 @@ public class OptimisticGridCharacteristics extends ReputationSystem {
      * Returns the estimated likelihoods that a worker will return the same
      * wrong result than each other.
      */
-    public Map<Worker,Estimator> getCollusionLikelihood(Worker worker,
-            Set<Worker> workers) {
-        Map<Worker,Estimator> result = new HashMap<Worker,Estimator>();
-        for (Worker otherWorker : workers)
+    public <W extends Worker> Map<W,Estimator> getCollusionLikelihood(W worker,
+            Set<W> workers) {
+        Map<W,Estimator> result = new HashMap<W,Estimator>();
+        for (W otherWorker : workers)
             result.put(otherWorker, new BTS(0.0d));
         return result;
     }

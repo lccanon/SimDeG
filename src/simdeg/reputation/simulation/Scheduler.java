@@ -53,7 +53,7 @@ public class Scheduler {
 	protected Scheduler(ReputationSystem reputationSystem, Evaluator evaluator) {
 		this.reputationSystem = reputationSystem;
         this.evaluator = evaluator;
-		logger.info("Scheduler created with " + reputationSystem);
+		logger.info("Scheduler created with the " + reputationSystem);
 	}
 
 	/**
@@ -85,7 +85,9 @@ public class Scheduler {
         Map<Worker, Double> result = new HashMap<Worker, Double>();
         double totalWeight = 0.0d;
         for (Worker worker : jobsQueue.keySet()) {
-            final double weight = RandomManager.getRandom("result").nextBeta(0.0d, jobsQueue.size(), 1.0d, resultArrivalHeterogeneity);
+            final double weight = RandomManager.getRandom("result")
+                .nextBeta(0.0d, jobsQueue.size(), 1.0d,
+                        resultArrivalHeterogeneity * Math.sqrt(jobsQueue.size() - 1));
             result.put(worker, weight);
             totalWeight += weight;
         }
@@ -137,6 +139,7 @@ public class Scheduler {
                     resourcesGroupSizeStdDev);
 
             /* Put the given job in the queues of every specified workers */
+            workersJob.put(job, new HashSet<Worker>());
             for (Worker otherWorker : jobsQueue.keySet()) {
                 jobsQueue.get(otherWorker).offer(job);
                 workersJob.get(job).add(otherWorker);
@@ -160,13 +163,22 @@ public class Scheduler {
 	 */
 	private Result getCertifiedResult(Job job, Evaluator evaluator) {
 		List<Result> resultsList = resultingResults.get(job);
-        Result result = null; // TODO error from reputationSytem & evaluator
+        Map<Result, Integer> map = new HashMap<Result, Integer>();
+        for (Result result : resultsList)
+            map.put(result, 0);
+        for (Result result : resultsList)
+            map.put(result, map.get(result) + 1);
+        Result majorityResult = null;
+        for (Result result : resultsList)
+            if (majorityResult == null
+                    || map.get(result) > map.get(majorityResult))
+                majorityResult = result;
 
         /* Cleaning */
         resultingResults.remove(job);
         workersJob.remove(job);
 
-        return result;
+        return majorityResult;
 	}
 
     /**
@@ -208,9 +220,7 @@ public class Scheduler {
             logger.fine("Worker " + worker + " is selected at step " + step);
 
         }
-        
-        /* Final step notification */
-        evaluator.setStep(stepsNumber);
+
     }
 
 }

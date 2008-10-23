@@ -14,9 +14,9 @@ public class Switcher<E> {
 
     private static final double A = 805153;
 
-    E[] elements;
+    private E[] elements;
 
-    double[] starts, ends;
+    private double[] starts, ends;
 
     /*
      * Specific constructor for 2 elements only.
@@ -25,6 +25,10 @@ public class Switcher<E> {
         this(elements, new double[] {start}, new double[] {end});
     }
 
+    /**
+     * General constructor where the first elements has to be returned before
+     * the first transition between starts[0] and ends[0].
+     */
     public Switcher(E[] elements, double[] starts, double[] ends) {
         if (elements == null || starts == null || ends == null
                 || starts.length != ends.length
@@ -39,6 +43,8 @@ public class Switcher<E> {
     }
 
     public E get(double time) {
+        if (elements.length == 1)
+            return elements[0];
         if (time < 0.0d) throw new IllegalArgumentException();
         if (time <= starts[0])
             return elements[0];
