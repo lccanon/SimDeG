@@ -2,9 +2,11 @@ package simdeg.simulation;
 
 import org.junit.Test;
 
+import simdeg.util.OutOfRangeException;
+
 public class TestCollusionGroup {
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected=OutOfRangeException.class)
     public void collusionGroupException() {
         new CollusionGroup(1.1d, "");
     }

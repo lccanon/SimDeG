@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 import simdeg.reputation.Worker;
 import simdeg.util.Collections;
 import simdeg.util.Estimator;
-import simdeg.util.LUT;
+import simdeg.util.UnaryLUT;
 import simdeg.util.RandomManager;
 import flanagan.analysis.Stat;
 
@@ -38,17 +38,16 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
     /** Precision of the LUT */
     private static final double LUT_PRECISION = 0.01d;
 
-    private LUT<Double,Integer> minSizeValues = null;
+    private static UnaryLUT<Double,Integer> minSizeValues = null;
 
     /**
-     * Constructs the object and generates a binary LUT for fastening complex
-     * computations.
+     * Generates a LUT for fastening complex computations.
      */
-    public GreedyGracefulResourcesGrouper() {
+    static {
         try {
             Method minSizeMethod = GreedyGracefulResourcesGrouper.class
                 .getMethod("minSize", Double.TYPE);
-            minSizeValues = new LUT<Double,Integer>(minSizeMethod,
+            minSizeValues = new UnaryLUT<Double,Integer>(minSizeMethod,
                     new Double[] {0.0d, 1.0d, LUT_PRECISION});
         } catch (NoSuchMethodException e) {
             logger.log(Level.SEVERE,
@@ -130,7 +129,7 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
         return i;
     }
 
-    private Set<Worker> getGracefulGroup(Worker worker) {
+    private static Set<Worker> getGracefulGroup(Worker worker) {
         logger.fine("Graceful policy is chosen");
         return Collections.addElement(worker, new HashSet<Worker>());
     }

@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 
 import simdeg.util.RandomManager;
 import simdeg.util.Switcher;
+import simdeg.util.OutOfRangeException;
 
 /**
  * Workers are agents that treat more or less successfully the Jobs they are
@@ -72,8 +73,8 @@ class Worker implements simdeg.reputation.Worker {
         for (CollusionGroup buggingGroup : buggingGroups.get(0.0d))
             probabilityCollusion = (1.0d - probabilityCollusion)
                 * buggingGroup.getProbability() + probabilityCollusion;
-        if (probabilityCollusion > reliability.get(0.0d))
-            throw new IllegalArgumentException("Collusion probability are too high");
+        if (probabilityCollusion < 0.0d || probabilityCollusion > reliability.get(0.0d))
+            throw new OutOfRangeException(probabilityCollusion, 0.0d, reliability.get(0.0d));
     }
 
     /**

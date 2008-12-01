@@ -15,6 +15,7 @@ import simdeg.reputation.ReputationSystem;
 import simdeg.util.Switcher;
 import simdeg.util.Estimator;
 import simdeg.util.BTS;
+import simdeg.util.OutOfRangeException;
 
 public class TestScheduler {
 
@@ -148,10 +149,10 @@ public class TestScheduler {
         evaluator.setSteps(100, 100, 100);
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
         scheduler.addAllWorkers(workersReliability.keySet());
-        scheduler.start(100, 3.0d, 1.0d, 0.9d);
+        scheduler.start(100, 3.0d, 0.5d, 0.9d);
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected=OutOfRangeException.class)
         public void startException() {
         ReputationSystem reputationSystem = getReputationSystem();
         Evaluator evaluator = new Evaluator(reputationSystem);
@@ -162,7 +163,7 @@ public class TestScheduler {
         evaluator.setSteps(100, 100, 100);
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
         scheduler.addAllWorkers(workersReliability.keySet());
-        scheduler.start(100, 3.0d, 3.0d, 0.9d);
+        scheduler.start(100, 3.0d, 1.0d, 0.9d);
     }
 
 }

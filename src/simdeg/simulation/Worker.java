@@ -10,6 +10,8 @@ import java.util.logging.Logger;
 
 import simdeg.util.RandomManager;
 import simdeg.util.Switcher;
+import simdeg.util.OutOfRangeException;
+
 import simgrid.msg.Msg;
 import simgrid.msg.Host;
 import simgrid.msg.Task;
@@ -160,9 +162,8 @@ class Worker extends simgrid.msg.Process implements simdeg.reputation.Worker {
             maxProbaCollusion = Math.max(maxProbaCollusion,
                     buggingGroup.getProbability());
         probabilityTotal += maxProbaCollusion;
-        if (probabilityTotal > 1.0d)
-            throw new IllegalArgumentException("Specified probabilities are "
-                    + probabilityTotal);
+        if (probabilityTotal < 0.0d || probabilityTotal > 1.0d)
+            throw new OutOfRangeException(probabilityTotal, 0.0d, 1.0d);
     }
 
     /**

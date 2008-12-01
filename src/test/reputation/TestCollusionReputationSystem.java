@@ -12,7 +12,7 @@ import java.util.NoSuchElementException;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class TestAgreementReputationSystem {
+public class TestCollusionReputationSystem {
 
     private static Worker workerFirst;
     private static Set<Worker> workersFirst;

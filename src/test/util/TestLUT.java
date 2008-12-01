@@ -16,7 +16,7 @@ public class TestLUT {
 
     @Test public void getValue() throws NoSuchMethodException {
         Method squareMethod = TestLUT.class.getMethod("square", Double.TYPE);
-        LUT<Double,Double> methodValues = new LUT<Double,Double>(
+        UnaryLUT<Double,Double> methodValues = new UnaryLUT<Double,Double>(
                     squareMethod, new Double[] {0.0d, 1.0d, EPSILON/10.0d});
         for (int i=-100; i<200; i++)
             assertEquals(methodValues.getValue(i/100.0d), square(i/100.0d),

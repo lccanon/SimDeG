@@ -1073,6 +1073,9 @@ public class MersenneTwisterFast implements Serializable, Cloneable
      * standard deviation as specified.
      */
     public final double nextBeta(double min, double max, double mean, double stdDev) {
+        if (stdDev == 0.0d)
+            return mean;
+
         final double meanNormalized = (mean - min) / (max - min);
         final double stdDevNormalized = stdDev / (max - min);
         if (meanNormalized * (1.0d - meanNormalized) < stdDevNormalized * stdDevNormalized)

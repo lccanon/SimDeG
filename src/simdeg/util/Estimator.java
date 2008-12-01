@@ -8,60 +8,105 @@ import java.util.Collection;
 
 public abstract class Estimator {
 
+    /** Default confidence level concerning the committed error */
+    public final static double DEFAULT_LEVEL = 0.95d;
+
+    /** Default error of precise estimator */
+    public static final double DEFAULT_ERROR = 1E-2d;
+
+    protected double lower = Double.NEGATIVE_INFINITY;
+
+    protected double upper = Double.POSITIVE_INFINITY;
+
+    /**
+     * Generic duplication and creation.
+     */
     public abstract Estimator clone();
 
-    public abstract Estimator clone(double value);
-
-    public abstract Estimator clone(double value, double error);
-
+    /**
+     * Updates new values.
+     */
     public abstract void setSample(double value);
+
+
+    /* Public accessors */
 
     public abstract double getEstimate();
 
-    abstract void setEstimate(double estimate);
+    protected abstract double getVariance();
 
     public abstract double getError();
 
-    abstract void setError(double error);
+    public abstract double getError(double level);
 
-    public abstract double getConsistency(Estimator estimator);
+    public double getConsistency(Estimator estimator) {
+        final double maxError = Math.max(getError(),
+                estimator.getError());
+        if (Math.abs(getEstimate() - estimator.getEstimate()) > maxError)
+            return 0.0d;
+        return 1.0d - maxError;
+    }
+
+    /**
+     * Internal operation for setting to a given estimate and variance.
+     */
+    protected abstract boolean set(double estimate, double variance);
+
+
+    /* General operations */
+
+    protected double getLowerEndpoint() {
+        return this.lower;
+    }
+
+    protected double getUpperEndpoint() {
+        return this.upper;
+    }
+
+    /**
+     * Sets the interval of current estimator.
+     */
+    public void setRange(double lower, double upper) {
+        /* Test for admissibility of parameters */
+        if (lower > upper)
+            throw new IllegalArgumentException("Range is not admissible: [" + lower + ", " + upper + "]");
+        final double estimate = getEstimate();
+        final double variance = getVariance();
+        this.lower = lower;
+        this.upper = upper;
+        /* Try to keep the same characteristics */
+        if (!set(estimate, variance))
+            reset();
+    }
+
+    /**
+     * Reinitializes the parameters of this estimator.
+     */
+    public abstract Estimator reset();
+
+
+    /* Arithmetic operations */
+
+    public Estimator inverse() {
+        return this.multiply(-1.0d);
+    }
 
     public static Estimator inverse(Estimator estimator) {
         return estimator.clone().inverse();
     }
 
-    public Estimator inverse() {
-        final double error = getError();
-        setEstimate(-getEstimate());
-        setError(error);
-        return this;
-    }
-
-    public static Estimator max(Estimator v1, Estimator v2) {
-        System.out.println(v1 + " " + v2);
-        if (v1.getEstimate() > v2.getEstimate())
-            return v1.clone();
-        else
-            return v2.clone();
-    }
-
-    public static Estimator min(Estimator v1, Estimator v2) {
-        return max(inverse(v1), inverse(v2)).inverse();
-    }
-
-    public static Estimator add(Estimator v1, Estimator v2) {
-        return v1.clone().add(v2);
-    }
-
-    //XXX try with weights
     public Estimator add(Estimator estimator) {
-        setEstimate(estimator.getEstimate() + getEstimate());
-        setError((estimator.getError() + getError()) / 2.0d);
+        final double estimate = getEstimate();
+        final double variance = getVariance();
+        setRange(getLowerEndpoint() + estimator.getLowerEndpoint(),
+                getUpperEndpoint() + estimator.getUpperEndpoint());
+        set(estimate + estimator.getEstimate(),
+                variance + estimator.getVariance());
         return this;
     }
 
-    public static Estimator subtract(Estimator v1, Estimator v2) {
-        return v1.clone().subtract(v2);
+    public static Estimator add(Estimator e1, Estimator e2) {
+        return e1.clone().add(e2);
     }
 
     public Estimator subtract(Estimator estimator) {
@@ -70,28 +115,47 @@ public abstract class Estimator {
         return inverse();
     }
 
-    public static Estimator multiply(Estimator v1, double d) {
-        return v1.clone().multiply(d);
+    public static Estimator subtract(Estimator e1, Estimator e2) {
+        return e1.clone().subtract(e2);
+    }
+
+    public Estimator min(Estimator estimator) {
+        return inverse().max(inverse(estimator)).inverse();
+    }
+
+    public static Estimator min(Estimator e1, Estimator e2) {
+        return e1.clone().min(e2);
+    }
+
+    public Estimator max(Estimator estimator) {
+        //XXX better maximum
+        if (getEstimate() > estimator.getEstimate())
+            return this;
+        else
+            return estimator;
+    }
+
+    public static Estimator max(Estimator e1, Estimator e2) {
+        return e1.clone().max(e2);
     }
 
     public Estimator multiply(double d) {
-        setEstimate(d * getEstimate());
+        final double estimate = getEstimate();
+        final double variance = getVariance();
+        if (d < 0.0d)
+            setRange(d * getUpperEndpoint(), d * getLowerEndpoint());
+        else
+            setRange(d * getLowerEndpoint(), d * getUpperEndpoint());
+        set(d * estimate, d * d * variance);
         return this;
     }
 
-    public static Estimator mean(Collection<? extends Estimator> estimators) {
-        double numinator = 0.0d;
-        double denominator = 0.0d;
-        for (Estimator estimator : estimators) {
-            final double error = estimator.getError();
-            numinator += (1.0d - error) * estimator.getEstimate();
-            denominator += (1.0d - error);
-        }
-        final Estimator result = estimators.iterator().next().clone();
-        result.setEstimate(numinator/denominator);
-        result.setError(1.0d - denominator/estimators.size());
-        return result;
+    public static Estimator multiply(Estimator e1, double d) {
+        return e1.clone().multiply(d);
     }
+
+
+    /* Utilitary function */
 
     public String toString() {
         DecimalFormat df = new DecimalFormat("0.##",

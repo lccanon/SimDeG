@@ -44,14 +44,14 @@ public class EMA extends Estimator {
 
     private static final double LUT_PRECISION = 0.01d;
 
-    private static LUT<Double,Double> estimatorsConsistencyValues;
+    private static UnaryLUT<Double,Double> estimatorsConsistencyValues;
 
     static {
         try {
             Method estimatorsConsistencyMethod
                 = EMA.class.getMethod(
                         "getEstimatorsConsistency", Double.TYPE);
-            estimatorsConsistencyValues = new LUT<Double,Double>(
+            estimatorsConsistencyValues = new UnaryLUT<Double,Double>(
                     estimatorsConsistencyMethod,
                     new Double[] {0.0d, 1.0d, LUT_PRECISION});
         } catch (NoSuchMethodException e) {
@@ -67,8 +67,7 @@ public class EMA extends Estimator {
 
     public EMA(double estimate) {
         this(SHORT_TERM_STD_DEV, LONG_TERM_STD_DEV);
-        setEstimate(estimate);
-        setError(0.0d);
+        set(estimate, 0.0d);
     }
 
     public EMA(double shortTermStdDev, double longTermStdDev) {
@@ -116,7 +115,7 @@ public class EMA extends Estimator {
     public EMA clone(double value, double error) {
         EMA result = new EMA(shortTermEstimate, value,
                 shortTermStdDev, longTermStdDev);
-        result.setError(error);
+        result.set(result.getEstimate(), error);
         return result;
     }
 
@@ -131,17 +130,22 @@ public class EMA extends Estimator {
         return longTermEstimate;
     }
 
-    void setEstimate(double estimate) {
-        longTermEstimate = estimate;
-    }
-
     public double getError() {
         return 1.0d - getEstimatorsConsistency(abs(shortTermEstimate
                     - longTermEstimate));
         //return getEstimatorsConsistency(shortTermEstimate, longTermEstimate);
     }
 
-    void setError(double error) {
+    public double getError(double level) {
+        return getError();
+    }
+
+    public double getVariance() {
+        return 0.0d;
+    }
+
+    protected boolean set(double estimate, double error) {
+        longTermEstimate = estimate;
         //XXX dirty and higly approximate
         shortTermEstimate = longTermEstimate;
         while (getError() < error) {
@@ -150,6 +154,7 @@ public class EMA extends Estimator {
             else
                 shortTermEstimate -= 0.1;
         }
+        return true;
     }
 
     public double getConsistency(Estimator estimator) {
@@ -158,6 +163,10 @@ public class EMA extends Estimator {
                 getEstimatorsConsistency(abs(getEstimate()
                         - estimator.getEstimate()),
                     longTermWeight, longTermWeight));
+    }
+
+    public EMA reset() {
+        return this;
     }
 
 }

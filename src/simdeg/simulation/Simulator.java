@@ -117,6 +117,7 @@ class Simulator {
                 case AttackingGroupNumber2:
                     if (Integer.valueOf(value) < 0)
                         throw new Exception(value + " is negative");
+                    break;
                 case JobsCostMean: case JobsCostStdDev: case JobsArrivalRate:
                 case WorkersSpeedMin: case WorkersSpeedMax: case WorkersSpeedMean:
                 case WorkersSpeedStdDev: case ReliabilityWorkersFraction1:

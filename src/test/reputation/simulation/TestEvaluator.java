@@ -15,6 +15,7 @@ import simdeg.reputation.ReputationSystem;
 import simdeg.util.Switcher;
 import simdeg.util.Estimator;
 import simdeg.util.BTS;
+import simdeg.util.OutOfRangeException;
 
 public class TestEvaluator {
 
@@ -122,7 +123,7 @@ public class TestEvaluator {
             evaluator.setStep(i);
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected=OutOfRangeException.class)
         public void setStepException() {
         Evaluator evaluator = new Evaluator(getReputationSystem());
         Map<Worker,Switcher<Double>> workersReliability = new HashMap<Worker,Switcher<Double>>();

@@ -24,6 +24,7 @@ import java.util.logging.Logger;
 import simdeg.reputation.ReputationSystem;
 import simdeg.util.RandomManager;
 import simdeg.util.Switcher;
+import simdeg.util.OutOfRangeException;
 
 /**
  * The Simulator is the supervisor of the simulated system. It generates and
@@ -45,7 +46,7 @@ class Simulator {
     private static ReputationSystem reputationSystem = null;
 
     private static double resourcesGroupSizeMean = 0.0d;
-    private static double resourcesGroupSizeStdDev = 0.0d;
+    private static double resourcesGroupSizeHeterogeneity = 0.0d;
 
     private static int stepsNumber = 0;
     private static int workersNumber = 0;
@@ -56,7 +57,7 @@ class Simulator {
     private static double reliabilityWorkersFraction2 = 0.0d;
     private static double reliabilityProbability2 = 0.0d;
     private static int reliabilitySwitchStep = 0;
-    private static int reliabilitySwitchSpeed = 0;
+    private static double reliabilitySwitchSpeed = 0.0d;
     private static double reliabilityPropagationRate = 0.0d;
 
     private static int buggingGroupNumber1 = 0;
@@ -66,11 +67,11 @@ class Simulator {
     private static List<Double> buggingWorkersFraction2 = null;
     private static List<Double> buggingJobsFraction2 = null;
     private static int buggingSwitchStep = 0;
-    private static int buggingSwitchSpeed = 0;
+    private static double buggingSwitchSpeed = 0.0d;
     private static double buggingPropagationRate = 0.0d;
 
     private static enum Parameter {
-        ReputationSystem, SchedulingSeed,
+        ReputationSystemComponent, ResourcesGroupSizeMean, ResourcesGroupSizeHeterogeneity, SchedulingSeed,
         StepsNumber, WorkersNumber, ResultArrivalHeterogeneity, ResultArrivalSeed,
         ReliabilityWorkersFraction1, ReliabilityProbability1,
         ReliabilityWorkersFraction2, ReliabilityProbability2,
@@ -86,23 +87,24 @@ class Simulator {
     private static void addParameter(String name, String value) {
         switch (Parameter.valueOf(name)) {
             case StepsNumber: case WorkersNumber: case ReliabilitySwitchStep:
-            case ReliabilitySwitchSpeed: case BuggingGroupNumber1:
-            case BuggingGroupNumber2: case BuggingSwitchStep:
-            case BuggingSwitchSpeed:
+            case BuggingGroupNumber1: case BuggingGroupNumber2: case BuggingSwitchStep:
                 if (Integer.valueOf(value) < 0)
-                    throw new IllegalArgumentException(value + " is negative");
+                    throw new OutOfRangeException(Integer.valueOf(value), 0, Integer.MAX_VALUE);
+                break;
+            case ResourcesGroupSizeMean: case ResourcesGroupSizeHeterogeneity:
             case ResultArrivalHeterogeneity: case ReliabilityWorkersFraction1:
             case ReliabilityProbability1: case ReliabilityWorkersFraction2:
             case ReliabilityProbability2: case ReliabilityPropagationRate:
+            case ReliabilitySwitchSpeed: case BuggingSwitchSpeed:
             case BuggingPropagationRate:
                 if (Double.valueOf(value) < 0)
-                    throw new IllegalArgumentException(value + " is negative");
+                    throw new OutOfRangeException(Double.valueOf(value), 0.0d, Double.MAX_VALUE);
                 break;
             default:
         }
         try {
             switch (Parameter.valueOf(name)) {
-                case ReputationSystem:
+                case ReputationSystemComponent:
                     try {
                         String gridCharacteristicsStr = "simdeg.reputation." + value;
                         reputationSystem = (ReputationSystem)Class.forName
@@ -112,6 +114,12 @@ class Simulator {
                                 + " is not implemented", e);
                         System.exit(1);
                     }
+                    break;
+                case ResourcesGroupSizeMean:
+                    resourcesGroupSizeMean = Double.valueOf(value);
+                    break;
+                case ResourcesGroupSizeHeterogeneity:
+                    resourcesGroupSizeHeterogeneity = Double.valueOf(value);
                     break;
                 case SchedulingSeed:
                     RandomManager.setSeed("scheduling", Long.valueOf(value));
@@ -144,7 +152,7 @@ class Simulator {
                     reliabilitySwitchStep = Integer.valueOf(value);
                     break;
                 case ReliabilitySwitchSpeed:
-                    reliabilitySwitchSpeed = Integer.valueOf(value);
+                    reliabilitySwitchSpeed = Double.valueOf(value);
                     break;
                 case ReliabilityPropagationRate:
                     reliabilityPropagationRate = Double.valueOf(value);
@@ -174,7 +182,7 @@ class Simulator {
                     buggingSwitchStep = Integer.valueOf(value);
                     break;
                 case BuggingSwitchSpeed:
-                    buggingSwitchSpeed = Integer.valueOf(value);
+                    buggingSwitchSpeed = Double.valueOf(value);
                     break;
                 case BuggingPropagationRate:
                     buggingPropagationRate = Double.valueOf(value);
@@ -408,7 +416,7 @@ class Simulator {
 
         /* Launch the simulation */
         scheduler.start(stepsNumber, resourcesGroupSizeMean,
-                resourcesGroupSizeStdDev, resultArrivalHeterogeneity);
+                resourcesGroupSizeHeterogeneity, resultArrivalHeterogeneity);
     }
 
 }

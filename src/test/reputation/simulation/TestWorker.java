@@ -10,6 +10,7 @@ import org.junit.Before;
 import static org.junit.Assert.*;
 
 import simdeg.util.Switcher;
+import simdeg.util.OutOfRangeException;
 
 public class TestWorker {
 
@@ -35,7 +36,7 @@ public class TestWorker {
         new Worker("worker", rel, col);
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected=OutOfRangeException.class)
         public void workerException() {
         proba[0] = 0.5d;
         Switcher<Double> rel = new Switcher<Double>(proba, new double[0], new double[0]);

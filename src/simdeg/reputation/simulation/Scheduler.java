@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 import simdeg.reputation.ReputationSystem;
 import simdeg.util.RandomManager;
 import simdeg.util.Collections;
+import simdeg.util.OutOfRangeException;
 
 /**
  * Main component of the scheduling package. It provides a generic interface for
@@ -118,10 +119,11 @@ public class Scheduler {
      * Replaces the heuristic in charge of grouping resources.
      */
     private Set<Worker> getGroup(double resourcesGroupSizeMean,
-            double resourcesGroupSizeStdDev) {
+            double resourcesGroupSizeHeterogeneity) {
         final int size = (int)Math.round(RandomManager.getRandom("scheduling")
-                .nextBeta(0.0d, jobsQueue.size(), resourcesGroupSizeMean,
-                    resourcesGroupSizeStdDev));
+                .nextBeta(1.0d, jobsQueue.size(), resourcesGroupSizeMean,
+                    resourcesGroupSizeHeterogeneity * Math.sqrt((resourcesGroupSizeMean - 1.0d)
+                        * (jobsQueue.size() - resourcesGroupSizeMean))));
         return Collections.getRandomSubGroup(size, jobsQueue.keySet(),
                 RandomManager.getRandom("scheduling"));
     }
@@ -131,12 +133,12 @@ public class Scheduler {
 	 * Requests a job for a given worker.
 	 */
     private Job getJob(Worker worker, double resourcesGroupSizeMean,
-            double resourcesGroupSizeStdDev) {
+            double resourcesGroupSizeHeterogeneity) {
 		if (jobsQueue.get(worker).isEmpty()) {
             /* Create a new job and find workers for it */
 			Job job = new Job("job" + jobIndex++);
             Set<Worker> currentWorkers = getGroup(resourcesGroupSizeMean,
-                    resourcesGroupSizeStdDev);
+                    resourcesGroupSizeHeterogeneity);
 
             /* Put the given job in the queues of every specified workers */
             workersJob.put(job, new HashSet<Worker>());
@@ -186,14 +188,18 @@ public class Scheduler {
      * point of view of the reputation system.
      */
     protected void start(int stepsNumber, double resourcesGroupSizeMean,
-            double resourcesGroupSizeStdDev, double resultArrivalHeterogeneity) {
+            double resourcesGroupSizeHeterogeneity, double resultArrivalHeterogeneity) {
+        /* Test for admissibility of parameters */
+        if (resourcesGroupSizeMean < 0.0d || resourcesGroupSizeMean > jobsQueue.size())
+            throw new OutOfRangeException(resourcesGroupSizeMean, 0.0d, (double)jobsQueue.size());
+
         Map<Worker, Double> heterogeneity
             = generateArrivalHeterogeneity(resultArrivalHeterogeneity);
 
         /* Assign a job to each worker */
         for (Worker worker : jobsQueue.keySet())
             worker.submitJob(getJob(worker, resourcesGroupSizeMean,
-                        resourcesGroupSizeStdDev));
+                        resourcesGroupSizeHeterogeneity));
 
         /* Main loop for getting results from workers and assigning them jobs */
         for (int step=0; step<stepsNumber; step++) {
@@ -215,7 +221,7 @@ public class Scheduler {
 
             /* Assignment */
             worker.submitJob(getJob(worker, resourcesGroupSizeMean,
-                        resourcesGroupSizeStdDev));
+                        resourcesGroupSizeHeterogeneity));
 
             logger.fine("Worker " + worker + " is selected at step " + step);
 

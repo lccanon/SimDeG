@@ -2,7 +2,8 @@ package simdeg.simulation;
 
 import java.util.logging.Logger;
 import java.util.logging.Level;
-import java.lang.IllegalArgumentException;
+
+import simdeg.util.OutOfRangeException;
 
 import simgrid.msg.Task;
 import simgrid.msg.MsgException;
@@ -53,8 +54,10 @@ class Job extends Task implements simdeg.reputation.Job<Result> {
             double submissionDate, Worker worker)
                 throws JniException, NativeException {
         this(name, computeDuration, server, null);
+        /* Test for admissibility of parameter */
         if (submissionDate < 0.0d)
-            throw new IllegalArgumentException("Invalid submission date");
+            throw new OutOfRangeException(submissionDate, 0.0d, Double.MAX_VALUE);
+
         this.submissionDate = submissionDate;
         this.worker = worker;
     }

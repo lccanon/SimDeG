@@ -1,7 +1,6 @@
 package simdeg.util;
 
 import java.util.logging.Logger;
-import java.lang.IllegalArgumentException;
 import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
 
@@ -15,20 +14,18 @@ public class BTS extends Beta {
     private static final Logger logger
         = Logger.getLogger(BTS.class.getName());
 
-    private static final double DEFAULT_LEVEL = 0.95d;
-
-    private final double level;
+    private double level = DEFAULT_LEVEL;
 
     private int successiveZero = 0;
 
     private int successiveOne = 0;
 
     public BTS() {
-        this(0.0d);
+        super();
     }
 
     public BTS(double estimate) {
-        this(estimate, 0.01d);
+        this(estimate, DEFAULT_ERROR);
     }
 
     public BTS(double estimate, double error) {
@@ -40,21 +37,16 @@ public class BTS extends Beta {
         this.level = level;
     }
 
+    /**
+     * Internal initialization for faster cloning.
+     */
+    protected BTS(double alpha, double beta, double lower, double upper, double level) {
+        super(alpha, beta, lower, upper);
+        this.level = level;
+    }
+
     public BTS clone() {
-        return new BTS(getEstimate(), getError(), level);
-    }
-
-    public BTS clone(double value) {
-        return new BTS(value, getError(), level);
-    }
-
-    public BTS clone(double value, double error) {
-        return new BTS(value, error, level);
-    }
-
-    private void reinit(String msg) {
-        logger.fine("Reinitialization probably because of " + msg);
-        setError(1.0d);
+        return new BTS(getAlpha(), getBeta(), getLowerEndpoint(), getUpperEndpoint(), level);
     }
 
     public void setSample(double value) {
@@ -62,20 +54,31 @@ public class BTS extends Beta {
         if (value == 1.0d) {
             successiveZero = 0;
             successiveOne++;
-            if (pow(getEstimate(), successiveOne) < 1.0d - level)
-                reinit("too much successive ones (" + successiveOne + ")");
+            if (pow(getEstimate(), successiveOne) < 1.0d - level) {
+                logger.fine("Reinitialization probably because of too much successive ones (" + successiveOne + ")");
+                reset();
+            }
         } else {
             successiveOne = 0;
             successiveZero++;
-            if (pow(1.0d - getEstimate(), successiveZero) < 1.0d - level)
-                reinit("too much successive zeros (" + successiveZero + ")");
+            if (pow(1.0d - getEstimate(), successiveZero) < 1.0d - level) {
+                logger.fine("Reinitialization probably because of too much successive zeros (" + successiveZero + ")");
+                reset();
+            }
         }
     }
 
-    void setEstimate(double estimate) {
-        super.setEstimate(estimate);
+    protected boolean set(double estimate, double variance) {
         successiveOne = 0;
         successiveZero = 0;
+        return super.set(estimate, variance);
+    }
+
+    public BTS reset() {
+        successiveOne = 0;
+        successiveZero = 0;
+        super.reset();
+        return this;
     }
 
 }

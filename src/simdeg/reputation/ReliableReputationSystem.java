@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.NoSuchElementException;
 import java.util.logging.Logger;
 
 import simdeg.util.BTS;
@@ -47,7 +48,7 @@ public abstract class ReliableReputationSystem extends ReputationSystem {
 	/**
 	 * Informs to the reputation system a triple of worker, job, and result.
 	 */
-	public void setWorkerResult(Worker worker, Job job, Result result) {
+	public final void setWorkerResult(Worker worker, Job job, Result result) {
 		/* Update data structures related to collusion and fault */
 		if (!workersByResults.containsKey(job))
 			workersByResults.put(job, new HashMap<Result, Set<Worker>>());
@@ -106,10 +107,10 @@ public abstract class ReliableReputationSystem extends ReputationSystem {
 	 * Informs to the reputation system a pair containing a job and the
 	 * certfified result associated to it.
 	 */
-	public void setCertifiedResult(Job job, Result result) {
+	public final void setCertifiedResult(Job job, Result result) {
 		Map<Result, Set<Worker>> workersByResult = workersByResults.get(job);
 		if (!workersByResult.containsKey(result))
-			throw new IllegalArgumentException(
+			throw new NoSuchElementException(
 					"Job never met before by the reputation system");
 
 		/*
@@ -139,16 +140,16 @@ public abstract class ReliableReputationSystem extends ReputationSystem {
 	/**
 	 * Specifies that some workers were found to give singleton result.
 	 */
-	protected void setFailure(Set<Worker> workers) {
+	protected final void setFailure(Set<Worker> workers) {
 		for (Worker worker : workers)
 			if (this.workers.contains(worker))
 				reliability.get(worker).setSample(0.0d);
 	}
 
 	/**
-	 * Specifies that some workers give same kind of result, hence success.
+	 * Specifies that some workers give the same kind of results, hence success.
 	 */
-	protected void setSuccess(Set<Worker> workers) {
+	protected final void setSuccess(Set<Worker> workers) {
 		for (Worker worker : workers)
 			if (this.workers.contains(worker))
 				reliability.get(worker).setSample(1.0d);
@@ -177,9 +178,9 @@ public abstract class ReliableReputationSystem extends ReputationSystem {
 	/**
 	 * Returns the estimated reliability of the worker.
 	 */
-	public Estimator getReliability(Worker worker) {
+	public final Estimator getReliability(Worker worker) {
 		if (!reliability.containsKey(worker))
-			throw new IllegalArgumentException("Inexistant worker");
+			throw new NoSuchElementException("Inexistant worker");
 		logger.finer("Reliability of worker " + worker + " is "
 				+ reliability.get(worker));
 		return reliability.get(worker);

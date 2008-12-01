@@ -43,6 +43,7 @@ public class TestEstimator {
                 BIG_EPSILON);
     }
 
+/*
     @Test public void mean() {
         Estimator e = Estimator.mean(Arrays.asList(e1, e2, e3, e4));
         assertEquals((e1.getEstimate() + e4.getEstimate())/2.0d,
@@ -50,5 +51,6 @@ public class TestEstimator {
         assertEquals((e1.getError() + e4.getError())/2.0d,
                 e.getError(), 2 * BIG_EPSILON);
     }
+*/
 
 }

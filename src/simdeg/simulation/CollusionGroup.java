@@ -2,9 +2,9 @@ package simdeg.simulation;
 
 import java.util.Set;
 import java.util.HashSet;
-import java.lang.IllegalArgumentException;
 
 import simdeg.util.RandomManager;
+import simdeg.util.OutOfRangeException;
 
 class CollusionGroup {
 
@@ -15,9 +15,10 @@ class CollusionGroup {
     private String randomKey;
 
     CollusionGroup(double probability, String randomKey) {
+        /* Test for admissibility of parameters */
         if (probability < 0.0d || probability > 1.0d)
-            throw new IllegalArgumentException("Not a proper probability: "
-                    + probability);
+            throw new OutOfRangeException(probability, 0.0d, 1.0d);
+
         setProbability(probability);
         this.randomKey = randomKey;
     }

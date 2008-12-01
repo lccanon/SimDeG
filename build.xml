@@ -2,7 +2,7 @@
   <property name="build-dir" value="build"/>
   <property name="src-dir" value="src"/>
   <property name="jar-file" value="jar/simdeg.jar"/>
-  <property name="main-class" value="simdeg.simulation.Simulator"/>
+  <property name="main-class" value="simdeg.reputation.simulation.Simulator"/>
   <property name="report-dir" value="report"/>
   <property name="doc-dir" value="doc"/>
   <tstamp>
@@ -10,7 +10,7 @@
   </tstamp>
   <target name="compile">
     <mkdir dir="${build-dir}"/>
-    <javac srcdir="${src-dir}" destdir="${build-dir}" debug="yes">
+    <javac srcdir="${src-dir}" destdir="${build-dir}" debug="yes" classpath="jar/junit-4.5.jar:jar/simgrid.jar:jar/flanagan.jar">
       <compilerarg value="-Xlint"/>
     </javac>
   </target>
@@ -41,7 +41,7 @@
       <fileset dir="example/" includes="simdeg*.log*"/>
     </delete>
   </target>
-  <target name="test" depends="jar">
+  <target name="test" depends="compile">
     <mkdir dir="${report-dir}"/>
     <junit printsummary="yes" haltonfailure="no" fork="true">
       <jvmarg line="-ea"/>
@@ -51,7 +51,7 @@
       <batchtest fork="yes" todir="${report-dir}">
         <formatter type="xml"/>
         <fileset dir="${build-dir}">
-          <include name="**/Test*.class"/>
+          <include name="**/reputation/TestC*M*.class"/>
           <exclude name="**/Test*$*.class"/>
         </fileset>
       </batchtest>

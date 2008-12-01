@@ -32,14 +32,16 @@ public class Collections {
 
     /**
      * Utilitary function which return a random subset of given size from a
-     * set. Throws an IllegalArgumentException if the size is too large.
+     * set. Throws an OutOfRangeException if the size is too large.
      */
     @SuppressWarnings("unchecked")
     public static <T> Set<T> getRandomSubGroup(int size, Set<T> group,
             MersenneTwisterFast random) {
+        /* Test for admissibility of parameters */
         if (size > group.size() || size < 0)
-            throw new IllegalArgumentException("Subgroup size is "
-                    + "out of bounds: " + size);
+            throw new OutOfRangeException(size, 0, group.size());
+
+        /* Optimization */
         if (size == 0)
             return new HashSet<T>();
         if (size == group.size())
@@ -51,6 +53,8 @@ public class Collections {
                 it.next();
             return addElement(it.next(), new HashSet<T>());
         }
+
+        /* Select randomly a subgroup */
         Set<T> subGroup = new HashSet<T>();
         T[] groupArray = group.toArray((T[])new Object[0]);
         for (int i=0; i<size; i++) {
@@ -65,13 +69,15 @@ public class Collections {
 
     /**
      * Utilitary function which return a random sublist of given size from a
-     * list. Throws an IllegalArgumentException if the size is too large.
+     * list. Throws an OutOfRangeException if the size is too large.
      */
     public static <T> List<T> getRandomSubGroup(int size, List<T> group,
             MersenneTwisterFast random) {
+        /* Test for admissibility of parameters */
         if (size > group.size() || size < 0)
-            throw new IllegalArgumentException("Subgroup size is "
-                    + "out of bounds: " + size);
+            throw new OutOfRangeException(size, 0, group.size());
+
+        /* Optimization */
         if (size == 0)
             return new ArrayList<T>();
         if (size == group.size())
@@ -80,6 +86,8 @@ public class Collections {
             final int value = random.nextInt(group.size());
             return addElement(group.get(value), new ArrayList<T>());
         }
+
+        /* Select randomly a subgroup */
         List<T> copyGroup = new ArrayList<T>(group);
         List<T> subGroup = new ArrayList<T>();
         for (int i=0; i<size; i++) {

@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 import simdeg.reputation.ReputationSystem;
 import simdeg.util.Switcher;
 import simdeg.util.Estimator;
+import simdeg.util.OutOfRangeException;
 
 /**
  * Accomplish the evaluation of a reputation system based on some
@@ -74,6 +75,9 @@ class Evaluator {
     /** Current and previous estimated fraction of colluders */
     private double estimatedFraction, previousFraction, errorFraction;
 
+    /** Simulator time */
+    private static long startTime = System.currentTimeMillis();
+
     /**
      * Constructor specifying the measured reputation system.
      */
@@ -127,7 +131,7 @@ class Evaluator {
      */
     protected void setStep(int step) {
         if (step < 0 || step >= stepsNumber)
-            throw new IllegalArgumentException("Steps are outside expectation");
+            throw new OutOfRangeException(step, 0, stepsNumber-1);
 
         if (step == 0)
             logger.info("Step,collusion RMSD,reliability RMSD,fraction RMSD,"
@@ -135,7 +139,8 @@ class Evaluator {
                     + "fraction error RMSD, collusion error correlation,"
                     + "reliability error correlation,collusion false negative,"
                     + "reliability false negative,fraction false negative,"
-                    + "collusion smoothness,reliability smoothness,fraction smoothness");
+                    + "collusion smoothness,reliability smoothness,"
+                    + "fraction smoothness,simulation time");
 
         /* Retrieve the values from the reputation system */
         getEstimatedValues();
@@ -155,12 +160,12 @@ class Evaluator {
         previousFraction = estimatedFraction;
 
         logger.info(String.format("%d,%12g,%12g,%12g,%12g,%12g,%12g,"
-                    + "%12g,%12g,%d,%d,%d,%12g,%12g,%12g", step,
+                    + "%12g,%12g,%d,%d,%d,%12g,%12g,%12g,%12g", step,
                     RMSDc[step], RMSDr[step], RMSDa[step], RMSDec[step],
                     RMSDer[step], RMSDea[step], corrEc[step], corrEr[step],
                     falseNegativeC[step], falseNegativeR[step],
                     falseNegativeA[step], smoothC[step], smoothR[step],
-                    smoothA[step]));
+                    smoothA[step], (System.currentTimeMillis() - startTime) * 1E-3d));
 
         if (step + 1 == stepsNumber) {
             logger.info("collusion adaptation length,"
@@ -345,6 +350,7 @@ class Evaluator {
                 smoothC[step] += Math.abs(old - current);
             }
         /* Reliability */
+        smoothR[step] = 0.0d;
         for (Worker worker : workers) {
             final double old = previousReliability.get(worker);
             final double current = estimatedReliability.get(worker);

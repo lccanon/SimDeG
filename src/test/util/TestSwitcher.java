@@ -26,12 +26,12 @@ public class TestSwitcher {
         assertEquals(switcher.get(10.0d), 300.0d, EPSILON);
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected=NullPointerException.class)
     public void switcherException() {
         new Switcher<Double>(null, null, null);
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected=OutOfRangeException.class)
     public void getException() {
         Switcher<Double> switcher = instance();
         switcher.get(-1.0d);
