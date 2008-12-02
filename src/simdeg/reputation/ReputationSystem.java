@@ -8,43 +8,10 @@ import simdeg.util.Estimator;
 
 /**
  * Stores and handles all observations relative to the Desktop grids on which we
- * are running. Is only concerned with added workers and should manage old
- * workers.
+ * are running. Specifies additional methods given information about collusion
+ * behavior among workers.
  */
-public abstract class ReputationSystem {
-
-	/** Set of workers we are manipulating */
-	protected Set<Worker> workers = new HashSet<Worker>();
-
-	/**
-	 * Gives participating workers.
-	 */
-	public void addAllWorkers(Set<? extends Worker> workers) {
-		this.workers.addAll(workers);
-	}
-
-	/**
-	 * Remove participating workers.
-	 */
-	public void removeAllWorkers(Set<? extends Worker> workers) {
-		this.workers.removeAll(workers);
-	}
-
-	/**
-	 * Informs to the reputation system a triple of worker, job, and result.
-	 */
-	public abstract void setWorkerResult(Worker worker, Job job, Result result);
-
-	/**
-	 * Informs to the reputation system a pair containing a job and the
-	 * certfified result associated to it.
-	 */
-	public abstract void setCertifiedResult(Job job, Result result);
-
-	/**
-	 * Returns the estimated reliability of the worker.
-	 */
-	public abstract Estimator getReliability(Worker worker);
+public interface ReputationSystem extends BasicReputationSystem {
 
 	/**
 	 * Returns the estimated likelihood that a given group of workers give the

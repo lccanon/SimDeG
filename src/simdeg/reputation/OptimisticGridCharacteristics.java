@@ -2,6 +2,7 @@ package simdeg.reputation;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.HashSet;
 import java.util.Set;
 
 import simdeg.util.BTS;
@@ -10,7 +11,24 @@ import simdeg.util.Estimator;
 /**
  * Optimistic strategy considering no collusion and no failure
  */
-public class OptimisticGridCharacteristics extends ReputationSystem {
+public class OptimisticGridCharacteristics implements ReputationSystem {
+
+    /** Set of workers we are manipulating */
+    protected Set<Worker> workers = new HashSet<Worker>();
+
+    /**
+     * Gives participating workers.
+     */
+    public void addAllWorkers(Set<? extends Worker> workers) {
+        this.workers.addAll(workers);
+    }
+
+    /**
+     * Remove participating workers.
+     */
+    public void removeAllWorkers(Set<? extends Worker> workers) {
+        this.workers.removeAll(workers);
+    }
 
 	/**
 	 * Informs to the reputation system a triple of worker, job, and result.

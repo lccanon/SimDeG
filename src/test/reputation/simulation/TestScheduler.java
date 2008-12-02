@@ -32,6 +32,8 @@ public class TestScheduler {
 
     private static ReputationSystem getReputationSystem() {
         return new ReputationSystem() {
+            public void addAllWorkers(Set<? extends simdeg.reputation.Worker> workers) {}
+            public void removeAllWorkers(Set<? extends simdeg.reputation.Worker> workers) {}
             public void setWorkerResult(simdeg.reputation.Worker worker,
                     simdeg.reputation.Job job, simdeg.reputation.Result result) {
             }

@@ -20,7 +20,7 @@ import simdeg.util.Estimator;
 /**
  * Strategy considering failures and collusion with convergence.
  */
-public final class AgreementReputationSystem extends ReliableReputationSystem {
+public final class AgreementReputationSystem extends SkeletonReputationSystem {
 
 	/** Logger */
 	private static final Logger logger = Logger
@@ -29,9 +29,9 @@ public final class AgreementReputationSystem extends ReliableReputationSystem {
 	private final AgreementMatrix agreement = new AgreementMatrix(new BTS(1.0d));
 
 	/**
-	 * Keep track of each update made on the AgreementMatrix.
+	 * Keep track of each update made on the AgreementMatrix (nice structure).
 	 * For each job, the set of pairs of internal set to the AgreementMatrix is
-	 * stored. This allows to avoid long sequence of similar event which would
+	 * stored. This allows to avoid long sequence of similar events which would
 	 * pertube the estimators.
 	 */
 	private final Map<Job, Set<Set<Set<Worker>>>> updatedSets = new HashMap<Job, Set<Set<Set<Worker>>>>();

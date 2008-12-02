@@ -24,6 +24,7 @@ public class TestCollusionReputationSystem {
     private static final double EPSILON = 2E-2d;
     private static final double BIG_EPSILON = 2E-1d;
 
+/*
     @BeforeClass public static void createWorkers() {
         workersList = new ArrayList<Set<Worker>>();
         workersList.add(new HashSet<Worker>());
@@ -41,28 +42,6 @@ public class TestCollusionReputationSystem {
         for (Set<Worker> set : workersList)
             workers.addAll(set);
         scenarios();
-    }
-
-    @Test(expected=NoSuchElementException.class)
-    public void reliabilityHistoryException() {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        gc.addAllWorkers(workersList.get(2));
-        gc.getReliability(workerFirst);
-    }
-
-    @Test public void getReliability() {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        gc.addAllWorkers(workers);
-        for (int i=0; i<100; i++)
-            gc.setSuccess(workersFirst);
-        assertEquals(1.0d, gc.getReliability(workerFirst).getEstimate(),
-                EPSILON);
-        for (int i=0; i<100; i++)
-            gc.setFailure(workersFirst);
-        assertEquals(0.0d, gc.getReliability(workerFirst).getEstimate(),
-                EPSILON);
     }
 
     private static void setAgreement(AgreementReputationSystem gc, Job job,
@@ -225,7 +204,9 @@ public class TestCollusionReputationSystem {
             set.addAll(workersList.get(1));
             set.addAll(workersList.get(2));
             set.addAll(workersList.get(3));
+*/
             /* This value should be 0.0d, but we do our best */
+/*
             assertEquals(0.2d, gcs.get(i).getCollusionLikelihood(set)
                     .getEstimate(), EPSILON);
         }
@@ -248,10 +229,13 @@ public class TestCollusionReputationSystem {
             set.addAll(workersList.get(3));
             set.addAll(workersList.get(4));
             set.addAll(workersList.get(5));
+*/
             /* This value should be 0.1d, but we do our best */
+/*
             assertEquals(0.2d, gcs.get(i).getCollusionLikelihood(set)
                     .getEstimate(), EPSILON);
         }
     }
+*/
 
 }

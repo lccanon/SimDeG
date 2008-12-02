@@ -43,28 +43,6 @@ public class TestAgreementReputationSystem {
         scenarios();
     }
 
-    @Test(expected=NoSuchElementException.class)
-    public void reliabilityHistoryException() {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        gc.addAllWorkers(workersList.get(2));
-        gc.getReliability(workerFirst);
-    }
-
-    @Test public void getReliability() {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        gc.addAllWorkers(workers);
-        for (int i=0; i<100; i++)
-            gc.setSuccess(workersFirst);
-        assertEquals(1.0d, gc.getReliability(workerFirst).getEstimate(),
-                EPSILON);
-        for (int i=0; i<100; i++)
-            gc.setFailure(workersFirst);
-        assertEquals(0.0d, gc.getReliability(workerFirst).getEstimate(),
-                EPSILON);
-    }
-
     private static void setAgreement(AgreementReputationSystem gc, Job job,
             Set<Worker> workers1, Set<Worker> workers2) {
         if (workers1 == workers2) {

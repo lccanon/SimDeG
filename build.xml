@@ -10,7 +10,17 @@
   </tstamp>
   <target name="compile">
     <mkdir dir="${build-dir}"/>
-    <javac srcdir="${src-dir}" destdir="${build-dir}" debug="yes" classpath="jar/junit-4.5.jar:jar/simgrid.jar:jar/flanagan.jar">
+    <javac destdir="${build-dir}" debug="yes" classpath="jar/junit-4.5.jar:jar/simgrid.jar:jar/flanagan.jar">
+      <src path="${src-dir}"/>
+      <exclude name="**/Test*.java"/>
+      <compilerarg value="-Xlint"/>
+    </javac>
+  </target>
+  <target name="compile-test" depends="compile">
+    <mkdir dir="${build-dir}"/>
+    <javac destdir="${build-dir}" debug="yes" classpath="jar/junit-4.5.jar:jar/simgrid.jar:jar/flanagan.jar">
+      <src path="${src-dir}"/>
+      <exclude name="**/simdeg/*.java"/>
       <compilerarg value="-Xlint"/>
     </javac>
   </target>
@@ -41,7 +51,7 @@
       <fileset dir="example/" includes="simdeg*.log*"/>
     </delete>
   </target>
-  <target name="test" depends="compile">
+  <target name="test" depends="compile-test">
     <mkdir dir="${report-dir}"/>
     <junit printsummary="yes" haltonfailure="no" fork="true">
       <jvmarg line="-ea"/>
