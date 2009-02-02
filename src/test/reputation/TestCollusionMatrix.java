@@ -36,14 +36,12 @@ public class TestCollusionMatrix {
     }
 
     @Before public void createMatrix() {
-        matrix = new CollusionMatrix(new BTS(0.0d, 1.0d));
+        matrix = new CollusionMatrix(new BTS());
     }
 
     @Test public void merge() {
         matrix.addAll(workers);
-        for (int i=0; i<15; i++) {
-    System.out.println(i);
-    matrix.print();
+        for (int i=0; i<100; i++) {
             /* Collusion in set 2 */
             for (Worker worker : workers2)
                 matrix.decreaseCollusion(worker, worker);
@@ -75,7 +73,6 @@ public class TestCollusionMatrix {
         assertEquals(0.0d, collusion2[0][0].getEstimate(), EPSILON);
     }
 
-@org.junit.Ignore
     @Test public void split() {
         matrix.addAll(workers);
         for (int i=0; i<100; i++)
@@ -90,7 +87,6 @@ public class TestCollusionMatrix {
         assertEquals(39, collusion.length);
     }
 
-@org.junit.Ignore
     @Test public void readapt() {
         matrix.addAll(workers);
         /* Merge all first workers in a non-colluding set */
@@ -107,33 +103,31 @@ public class TestCollusionMatrix {
             for (Worker worker : workers2)
                 for (Worker otherWorker : workers2) {
                     matrix.increaseCollusion(worker, otherWorker);
-                    if (matrix.getBiggest().size() > workers1.size())
+                    if (!matrix.getBiggest().containsAll(workers1))
                         break loop;
                 }
         }
         /* At this stage, the biggest set has just changed */
         final Estimator[][] collusion = matrix.getCollusions(matrix.getBiggest());
         assertEquals(1, collusion.length);
-        assertEquals(0.0d, collusion[0][0].getEstimate(), EPSILON);
+        assertEquals(0.0d, collusion[0][0].getEstimate(), collusion[0][0].getError());
     }
 
-@org.junit.Ignore
     @Test public void getCollusionsSimple() {
         matrix.addAll(workers);
         for (int i=0, j=0; i<100; i++) {
             /* First the dominant that will be the first to merge */
             for (Worker worker : workers2)
-                for (Worker otherWorker : workers2) {
+                matrix.decreaseCollusion(worker, worker);
+            for (Worker worker : workers2)
+                for (Worker otherWorker : workers2)
                     matrix.decreaseCollusion(worker, otherWorker);
-                    /* For symetry on the diagonal */
-                    if (worker == otherWorker)
-                        matrix.decreaseCollusion(worker, otherWorker);
-                }
             /* The non-dominant */
             for (Worker worker : workers1)
                 for (Worker otherWorker : workers1)
                     if ((i + j++) % 2 == 0) {
                         matrix.increaseCollusion(worker, otherWorker);
+                        /* For symetry on the diagonal */
                         if (worker == otherWorker)
                             matrix.increaseCollusion(worker, otherWorker);
                     } else {
@@ -160,7 +154,6 @@ public class TestCollusionMatrix {
         assertEquals(0.0d, collusion2[0][0].getEstimate(), EPSILON);
     }
 
-@org.junit.Ignore
     @Test public void getCollusions() {
         matrix.addAll(workers);
         Random rand = new Random(0L);
@@ -186,7 +179,7 @@ public class TestCollusionMatrix {
         assertEquals(0.0d, collusion[0][1].getEstimate(), EPSILON);
         final Estimator[][] collusion1 = matrix.getCollusions(workers1);
         assertEquals(1, collusion1.length);
-        assertEquals(0.5d, collusion1[0][0].getEstimate(), EPSILON);
+        assertEquals(0.5d, collusion1[0][0].getEstimate(), collusion1[0][0].getError());
         final Estimator[][] collusion2 = matrix.getCollusions(workers2);
         assertEquals(1, collusion2.length);
         assertEquals(0.0d, collusion2[0][0].getEstimate(), EPSILON);

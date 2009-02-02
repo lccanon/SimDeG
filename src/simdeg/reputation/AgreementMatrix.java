@@ -15,15 +15,10 @@ final class AgreementMatrix extends DynamicMatrix<Worker> {
     private static final Logger logger
         = Logger.getLogger(AgreementMatrix.class.getName());
 
-    /** Threshold below which a group is considering to not collude */
+    /**
+     * Threshold below which a group is considering to not collude. It implies
+     * that the error is not much than a function of this value. */
     private static final double AGREEMENT_THRESHOLD = 0.99d;
-
-    private static final double EPSILON = 1E-3;
-
-    /** 
-     * Maximal error allowed for merging sets.
-     */
-    private static final double MAX_ERROR = 1.0d / 3.0d;
 
     protected AgreementMatrix(Estimator estimatorBase) {
         super(estimatorBase);
@@ -40,9 +35,7 @@ final class AgreementMatrix extends DynamicMatrix<Worker> {
         /* Update estimator */
         getEstimator(set1, set2).setSample(1.0d);
         /* Test the possibility of merging both sets */
-        if (set1 != set2 && getEstimator(set1, set2).getEstimate()
-                > AGREEMENT_THRESHOLD
-                && getEstimator(set1, set2).getError() < MAX_ERROR)
+        if (set1 != set2 && getEstimator(set1, set2).getEstimate() > AGREEMENT_THRESHOLD)
             merge(set1, set2);
     }
 

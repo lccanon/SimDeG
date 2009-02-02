@@ -72,8 +72,6 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
 	 * certfified result associated to it.
 	 */
 	public void setCertifiedResult(Job job, Result result) {
-        super.setCertifiedResult(job, result);
-
 		Map<Result, Set<Worker>> workersByResult = workersByResults.get(job);
 		if (!workersByResult.containsKey(result))
 			throw new NoSuchElementException(
@@ -90,6 +88,8 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
 				winningSet = workersByResult.get(otherResult);
 		}
 		setDistinctSets(job, winningSet, sets);
+
+        super.setCertifiedResult(job, result);
 	}
 
 	/**

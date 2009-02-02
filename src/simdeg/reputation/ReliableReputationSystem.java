@@ -21,10 +21,11 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 			.getLogger(ReliableReputationSystem.class.getName());
 
 	/** Workers sorted by result for each job (for collusion) */
-    protected Map<Job, Map<Result, Set<Worker>>> workersByResults = new HashMap<Job, Map<Result, Set<Worker>>>();
+    protected Map<Job, Map<Result, Set<Worker>>> workersByResults
+        = new HashMap<Job, Map<Result, Set<Worker>>>();
 
-	/** Estimates of the reliability */
-	private Map<Worker, Estimator> reliability = new HashMap<Worker, Estimator>();
+    /** Estimates of the reliability */
+    private Map<Worker, Estimator> reliability = new HashMap<Worker, Estimator>();
     
     /** Set of workers we are manipulating */
     protected Set<Worker> workers = new HashSet<Worker>();
@@ -35,7 +36,7 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 	public void addAllWorkers(Set<? extends Worker> workers) {
         this.workers.addAll(workers);
 		for (Worker worker : workers)
-			reliability.put(worker, new BTS(1.0d));
+			reliability.put(worker, new BTS());
 	}
 
 	/**
@@ -60,11 +61,11 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 		workersByResult.get(result).add(worker);
 
 		/* Update successful worker(s) */
-		if (workersByResult.get(result).size() == 2)
+		if (workersByResult.get(result).size() == 2) {
             for (Worker successfulWorker : workersByResult.get(result))
                 if (this.workers.contains(successfulWorker))
                     reliability.get(successfulWorker).setSample(1.0d);
-		else if (workersByResult.get(result).size() > 2)
+        } else if (workersByResult.get(result).size() > 2)
             if (this.workers.contains(worker))
                 reliability.get(worker).setSample(1.0d);
 	}
@@ -80,7 +81,7 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 					"Job never met before by the reputation system");
 
 		/*
-		 * Remove every colluding group of answers and consider the rest as
+		 * Remove every colluding group of results and consider the rest as
 		 * failures
 		 */
 		for (Result otherResult : workersByResult.keySet())
@@ -89,6 +90,9 @@ public class ReliableReputationSystem implements BasicReputationSystem {
                 for (Worker worker : workersByResult.get(otherResult))
                     if (this.workers.contains(worker))
                         reliability.get(worker).setSample(0.0d);
+
+        /* Clean structure */
+        workersByResults.remove(job);
 	}
 
 	/**
@@ -101,5 +105,12 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 				+ reliability.get(worker));
 		return reliability.get(worker);
 	}
+
+    public void print() {
+        System.out.print("Reliability:");
+        for (Worker worker : workers)
+            System.out.print(" " + reliability.get(worker));
+        System.out.println();
+    }
 
 }

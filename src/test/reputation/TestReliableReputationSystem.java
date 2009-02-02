@@ -1,12 +1,15 @@
 package simdeg.reputation;
 
-import static org.junit.Assert.assertEquals;
+import simdeg.util.Estimator;
 
-import java.util.ArrayList;
-import java.util.HashSet;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.util.List;
-import java.util.Random;
+import java.util.ArrayList;
 import java.util.Set;
+import java.util.HashSet;
+import java.util.Random;
 import java.util.NoSuchElementException;
 
 import org.junit.BeforeClass;
@@ -14,55 +17,58 @@ import org.junit.Test;
 
 public class TestReliableReputationSystem {
 
-    private static Worker workerFirst;
-    private static Set<Worker> workersFirst;
-    private static List<Set<Worker>> workersList;
+    private static Worker worker;
     private static Set<Worker> workers;
 
+    private static final double MIN_ERROR = 0.25d;
     private static final double EPSILON = 2E-2d;
-    private static final double BIG_EPSILON = 2E-1d;
 
     @BeforeClass public static void createWorkers() {
-        workersList = new ArrayList<Set<Worker>>();
-        workersList.add(new HashSet<Worker>());
-        for (int i=0; i<25; i++)
-            workersList.get(0).add(new Worker() {});
-        workerFirst =  workersList.get(0).iterator().next();
-        workersFirst = new HashSet<Worker>();
-        workersFirst.add(workerFirst);
-        for (int i=1; i<6; i++) {
-            workersList.add(new HashSet<Worker>());
-            for (int j=0; j<15; j++)
-                workersList.get(i).add(new Worker() {});
-        }
         workers = new HashSet<Worker>();
-        for (Set<Worker> set : workersList)
-            workers.addAll(set);
-        //scenarios();
+        workers.add(new Worker() {});
+        workers.add(new Worker() {});
+        workers.add(new Worker() {});
+        worker = workers.iterator().next();
+    }
+
+    @Test public void getReliability() {
+        ReliableReputationSystem rrs
+            = new ReliableReputationSystem();
+        rrs.addAllWorkers(workers);
+        Estimator reliability = rrs.getReliability(worker);
+        assertTrue("Error too low: " + reliability.getError(),
+                reliability.getError() > MIN_ERROR);
     }
 
     @Test(expected=NoSuchElementException.class)
-    public void reliabilityHistoryException() {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        gc.addAllWorkers(workersList.get(2));
-        gc.getReliability(workerFirst);
+    public void getReliabilityException() {
+        ReliableReputationSystem rrs
+            = new ReliableReputationSystem();
+        rrs.getReliability(worker);
     }
 
-    /*
-    @Test public void getReliability() {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        gc.addAllWorkers(workers);
-        for (int i=0; i<100; i++)
-            gc.setSuccess(workersFirst);
-        assertEquals(1.0d, gc.getReliability(workerFirst).getEstimate(),
-                EPSILON);
-        for (int i=0; i<100; i++)
-            gc.setFailure(workersFirst);
-        assertEquals(0.0d, gc.getReliability(workerFirst).getEstimate(),
-                EPSILON);
+    @Test public void scenarioSimple() {
+        /* Initializations and declarations */
+        ReliableReputationSystem rrs = new ReliableReputationSystem();
+        rrs.addAllWorkers(workers);
+        /* Scenario with two sets */
+        Random rand = new Random(0L);
+        for (int i=0; i<100; i++) {
+            Job job = new Job() {};
+            Result correct = new Result() {};
+            Result bad = new Result() {};
+            for (Worker w : workers)
+                if (w != worker)
+                    rrs.setWorkerResult(w, job, correct);
+            if (rand.nextBoolean())
+                rrs.setWorkerResult(worker, job, correct);
+            else
+                rrs.setWorkerResult(worker, job, bad);
+            rrs.setCertifiedResult(job, correct);
+        }
+        /* Test collusion estimations */
+        Estimator reliability = rrs.getReliability(worker);
+        assertEquals(0.5d, reliability.getEstimate(), reliability.getError());
     }
-    */
 
 }

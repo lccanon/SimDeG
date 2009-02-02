@@ -38,7 +38,7 @@ public class DynamicMatrix<E> {
         this.estimatorBase = estimatorBase;
     }
 
-    public final void addAll(Collection<? extends E> elements) {
+    public void addAll(Collection<? extends E> elements) {
         /* Create new singleton sets and update reverse */
         for (E element : elements)
             if (!reverse.containsKey(element))
@@ -50,7 +50,7 @@ public class DynamicMatrix<E> {
         biggest = null;
     }
 
-    public final void removeAll(Collection<? extends E> elements) {
+    public void removeAll(Collection<? extends E> elements) {
         Collection<E> elementsToRemove = new HashSet<E>();
         for (E element : elements)
             if (reverse.containsKey(element))
@@ -79,18 +79,18 @@ public class DynamicMatrix<E> {
         biggest = null;
     }
 
-    public final Set<E> getAll() {
+    public Set<E> getAll() {
         return reverse.keySet();
     }
 
-    public final Set<E> getSet(E element) {
+    public Set<E> getSet(E element) {
         if (reverse.containsKey(element))
             return reverse.get(element);
         else
             throw new NoSuchElementException("Element never intialized");
     }
 
-    public final Set<Set<E>> getSets(Collection<? extends E> elements) {
+    public Set<Set<E>> getSets(Collection<? extends E> elements) {
         Set<Set<E>> sets = new HashSet<Set<E>>();
         for (E element : elements)
             sets.add(getSet(element));
@@ -98,7 +98,7 @@ public class DynamicMatrix<E> {
     }
 
     @SuppressWarnings("unchecked")
-    protected final void setEstimator(Set<E> set1,
+    protected void setEstimator(Set<E> set1,
             Set<E> set2, Estimator estimator) {
         testValidSet(set1, set2);
         if (estimator == null)
@@ -108,13 +108,13 @@ public class DynamicMatrix<E> {
     }
 
     @SuppressWarnings("unchecked")
-    protected final Estimator getEstimator(Set<E> set1,
+    protected Estimator getEstimator(Set<E> set1,
             Set<E> set2) {
         testValidSet(set1, set2);
         return matrix.get(set1).get(set2);
     }
 
-    public final Set<E> getBiggest() {
+    public Set<E> getBiggest() {
         if (biggest == null || biggest.isEmpty())
             updateBiggest();
         return biggest;
@@ -124,7 +124,7 @@ public class DynamicMatrix<E> {
      * Gives a quick error indications of the current estimations.
      */
     //TODO getGeneralError()
-    public final double getBiggestError() {
+    public double getBiggestError() {
         double result = 0.0d;
         for (Set<E> set : matrix.keySet())
             result += getEstimator(getBiggest(), set).getError();
@@ -136,7 +136,7 @@ public class DynamicMatrix<E> {
      * Merges the two sets if they are not already contained one in the other.
      */
     @SuppressWarnings("unchecked")
-    public final Set<E> merge(Set<E> set1, Set<E> set2) {
+    public Set<E> merge(Set<E> set1, Set<E> set2) {
         testValidSet(set1, set2);
         if (set1.containsAll(set2) || set2.containsAll(set1))
             return null;
@@ -163,7 +163,7 @@ public class DynamicMatrix<E> {
      * Splits the specified element from the set.
      */
     @SuppressWarnings("unchecked")
-    public final void split(Set<E> set, E element) {
+    public void split(Set<E> set, E element) {
         testValidSet(set);
         if (set.size() == 1 || !set.contains(element))
             return;
@@ -191,17 +191,17 @@ public class DynamicMatrix<E> {
     /**
      * Tests the validity of the set (its presence in the matrix).
      */
-    protected final void testValidSet(Set<E>... sets) {
+    protected void testValidSet(Set<E>... sets) {
         for (Set<E> set : sets)
             if (!matrix.containsKey(set))
-                throw new NoSuchElementException("Considered set does not exist "
+                throw new NoSuchElementException("The considered set is not present in the matrix: "
                         + Arrays.toString(set.toArray()));
     }
 
     /**
      * Inserts newly created sets.
      */
-    private final void insertSet(Set<E> set) {
+    private void insertSet(Set<E> set) {
         if (set.isEmpty())
             return;
         /* Add new row */
@@ -220,7 +220,7 @@ public class DynamicMatrix<E> {
     /**
      * Gives to the inserted set the cloned estimators of the initial set.
      */
-    private final void copyEstimator(Set<E> initialSet, Set<E> newSet) {
+    private void copyEstimator(Set<E> initialSet, Set<E> newSet) {
         for (Set<E> set : matrix.keySet())
             if (set != initialSet && set != newSet)
                 setEstimator(newSet, set, getEstimator(initialSet, set).clone());
@@ -231,15 +231,17 @@ public class DynamicMatrix<E> {
      * Inserts the new set that is similar to set1 or set2 (those with the
      * best estimation).
      */
-    private final void copyEstimator(Set<E> set1, Set<E> set2,
+    private void copyEstimator(Set<E> set1, Set<E> set2,
             Set<E> newSet) {
         for (Set<E> set : matrix.keySet())
             if (set != newSet && set != set1 && set != set2)
+                // XXX Mean of both estimator ?
                 if (getEstimator(set1, set).getVariance()
                         < getEstimator(set2, set).getVariance())
                     setEstimator(newSet, set, getEstimator(set1, set).clone());
                 else
                     setEstimator(newSet, set, getEstimator(set2, set).clone());
+        // XXX Mean of both estimator ?
         if (getEstimator(set1, set1).getVariance()
                 < getEstimator(set2, set2).getVariance())
             setEstimator(newSet, newSet, getEstimator(set1, set1).clone());
@@ -247,13 +249,13 @@ public class DynamicMatrix<E> {
             setEstimator(newSet, newSet, getEstimator(set2, set2).clone());
     }
 
-    private final void updateReverse(Set<E> elements) {
+    private void updateReverse(Set<E> elements) {
         for (E element : elements)
             reverse.put(element, elements);
         assert (checkReverse()) : "Reverse malformed";
     }
 
-    private final void updateBiggest() {
+    private void updateBiggest() {
         for (Set<E> set : matrix.keySet())
             if (biggest == null || set.size() > biggest.size())
                 biggest = set;
@@ -261,14 +263,14 @@ public class DynamicMatrix<E> {
             biggest = new HashSet<E>();
     }
 
-    private final void clean(Set<E> remove) {
+    private void clean(Set<E> remove) {
         for (Set<E> set : matrix.keySet())
             matrix.get(set).remove(remove);
         matrix.remove(remove);
         assert (checkMatrix()) : "Matrix malformed";
     }
 
-    private final boolean checkReverse() {
+    private boolean checkReverse() {
         for (Set<E> set : matrix.keySet())
             for (E element : set)
                 if (reverse.get(element) != set)
@@ -276,7 +278,7 @@ public class DynamicMatrix<E> {
         return true;
     }
 
-    private final boolean checkMatrix() {
+    private boolean checkMatrix() {
         for (Set<E> set : matrix.keySet())
             for (Set<E> otherSet : matrix.keySet())
                 if (getEstimator(set, otherSet) == null)
@@ -284,7 +286,7 @@ public class DynamicMatrix<E> {
         return true;
     }
 
-    public final void print() {
+    public void print() {
         for (Set<E> set1 : matrix.keySet()) {
             System.out.print("(" + set1.size() + "):");
             for (Set<E> set2 : matrix.keySet())

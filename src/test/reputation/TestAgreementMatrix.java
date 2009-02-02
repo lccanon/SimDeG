@@ -132,7 +132,7 @@ public class TestAgreementMatrix {
     @Test public void getAgreements() {
         matrix.addAll(workers);
         Random rand = new Random(0L);
-        for (int i=0; i<200; i++) {
+        for (int i=0; i<100; i++) {
             for (Worker worker : workers1)
                 for (Worker otherWorker : workers1)
                     matrix.increaseAgreement(worker, otherWorker);

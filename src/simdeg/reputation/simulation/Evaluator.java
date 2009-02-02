@@ -153,7 +153,7 @@ class Evaluator {
         /* Measures the adaptiveness quality of the system */
         measureAdaptiveness(step);
 
-        /* Handles the smothness metric */
+        /* Handles the smoothness metric */
         measureSmoothness(step);
         previousBugging = estimatedBugging;
         previousReliability = estimatedReliability;

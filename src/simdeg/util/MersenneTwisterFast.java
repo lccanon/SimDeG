@@ -1042,8 +1042,19 @@ public class MersenneTwisterFast implements Serializable, Cloneable
      * Returns a beta distributed value with parameters alpha and beta.
      */
     public final double nextBeta(double alpha, double beta) {
-        if (alpha <= 0.0d || beta <= 0.0d)
-            throw new IllegalArgumentException("Shape parameters are invalid");
+        /* Test the admissibility of parameters */
+        if (alpha < 0.0d)
+            throw new OutOfRangeException(alpha, 0.0d, Double.MAX_VALUE);
+        if (beta < 0.0d)
+            throw new OutOfRangeException(beta, 0.0d, Double.MAX_VALUE);
+
+        /* Optimizations */
+        if (alpha == 0.0d && beta == 0.0d)
+            return (nextDouble() > 0.5d) ? 1.0d : 0.0d;
+        if (alpha == 0.0d)
+            return 0.0d;
+        if (beta == 0.0d)
+            return 1.0d;
 
         double alpha1, beta1, gamma;
         double U1, U2, V, W, X;
@@ -1079,7 +1090,8 @@ public class MersenneTwisterFast implements Serializable, Cloneable
         final double meanNormalized = (mean - min) / (max - min);
         final double stdDevNormalized = stdDev / (max - min);
         if (meanNormalized * (1.0d - meanNormalized) < stdDevNormalized * stdDevNormalized)
-            throw new IllegalArgumentException("Standard deviation " + stdDev + " is too high");
+            throw new OutOfRangeException(stdDev, 0.0d,
+                    Math.sqrt(meanNormalized * (1.0d - meanNormalized)) * (max - min));
 
         final double alpha = meanNormalized * (meanNormalized * (1 - meanNormalized)
                 / (stdDevNormalized * stdDevNormalized) - 1.0d);

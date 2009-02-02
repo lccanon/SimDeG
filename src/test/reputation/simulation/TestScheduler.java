@@ -92,25 +92,25 @@ public class TestScheduler {
         Worker worker1 = new Worker("worker1", rel, col);
         workersReliability.put(worker1, rel);
         buggingGroups.put(worker1, col);
-         /* Worker2 */
+        /* Worker2 */
         proba = new Double[1];
         proba[0] = 1.0d;
         rel = new Switcher<Double>(proba, new double[0], new double[0]);
         Worker worker2 = new Worker("worker2", rel, col);
         workersReliability.put(worker2, rel);
         buggingGroups.put(worker2, col);
-         /* Worker3 */
+        /* Worker3 */
         group = new Set[1];
         group[0] = new HashSet<CollusionGroup>();
         col = new Switcher<Set<CollusionGroup>>(group, new double[0], new double[0]);
         Worker worker3 = new Worker("worker3", rel, col);
         workersReliability.put(worker3, rel);
         buggingGroups.put(worker3, col);
-         /* Worker4 */
+        /* Worker4 */
         Worker worker4 = new Worker("worker4", rel, col);
         workersReliability.put(worker4, rel);
         buggingGroups.put(worker4, col);
-         /* Worker5 */
+        /* Worker5 */
         Worker worker5 = new Worker("worker5", rel, col);
         workersReliability.put(worker5, rel);
         buggingGroups.put(worker5, col);
@@ -165,7 +165,7 @@ public class TestScheduler {
         evaluator.setSteps(100, 100, 100);
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
         scheduler.addAllWorkers(workersReliability.keySet());
-        scheduler.start(100, 3.0d, 1.0d, 0.9d);
+        scheduler.start(100, 3.0d, 1.01d, 0.9d);
     }
 
 }

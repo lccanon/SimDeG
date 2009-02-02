@@ -1,12 +1,18 @@
 package simdeg.reputation;
 
-import static org.junit.Assert.assertEquals;
+import static simdeg.util.Collections.addElement;
 
-import java.util.ArrayList;
-import java.util.HashSet;
+import simdeg.util.Estimator;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.util.List;
-import java.util.Random;
+import java.util.ArrayList;
 import java.util.Set;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Random;
 import java.util.NoSuchElementException;
 
 import org.junit.BeforeClass;
@@ -14,128 +20,112 @@ import org.junit.Test;
 
 public class TestCollusionReputationSystem {
 
-    private static Worker workerFirst;
-    private static Set<Worker> workersFirst;
-    private static List<Set<Worker>> workersList;
+    private static Worker worker;
     private static Set<Worker> workers;
-    private static List<AgreementReputationSystem> gcs
-        = new ArrayList<AgreementReputationSystem>();
+    private static List<Set<Worker>> workersList;
 
+    private static final double MIN_ERROR = 0.25d;
     private static final double EPSILON = 2E-2d;
-    private static final double BIG_EPSILON = 2E-1d;
 
-/*
     @BeforeClass public static void createWorkers() {
         workersList = new ArrayList<Set<Worker>>();
-        workersList.add(new HashSet<Worker>());
-        for (int i=0; i<25; i++)
-            workersList.get(0).add(new Worker() {});
-        workerFirst =  workersList.get(0).iterator().next();
-        workersFirst = new HashSet<Worker>();
-        workersFirst.add(workerFirst);
-        for (int i=1; i<6; i++) {
+        for (int i=0; i<6; i++) {
             workersList.add(new HashSet<Worker>());
-            for (int j=0; j<15; j++)
+            for (int j=0; j < (i==0?25:15); j++)
                 workersList.get(i).add(new Worker() {});
         }
         workers = new HashSet<Worker>();
         for (Set<Worker> set : workersList)
             workers.addAll(set);
-        scenarios();
+        worker = workers.iterator().next();
     }
 
-    private static void setAgreement(AgreementReputationSystem gc, Job job,
-            Set<Worker> workers1, Set<Worker> workers2) {
-        if (workers1 == workers2) {
-            Set<Worker> done = new HashSet<Worker>();
-            for (Worker worker1 : workers1) {
-                if (!done.isEmpty())
-                    gc.setAgreement(job, worker1, done);
-                done.add(worker1);
-            }
-        } else
-            for (Worker worker1 : workers1)
-                gc.setAgreement(job, worker1, workers2);
+    @Test public void setAgreement() {
+        CollusionReputationSystem crs = new CollusionReputationSystem();
+        crs.addAllWorkers(workers);
+        crs.setAgreement(new Job() {}, worker, workers);
     }
 
-    private static void setDisagreement(AgreementReputationSystem gc, Job job,
-            Set<Worker> workers1, Set<Worker> workers2) {
-        for (Worker worker1 : workers1)
-            gc.setDisagreement(job, worker1, workers2);
+    @Test public void setDisagreement() {
+        CollusionReputationSystem crs = new CollusionReputationSystem();
+        crs.addAllWorkers(workers);
+        crs.setDisagreement(new Job() {}, worker, workers);
     }
 
-    private static void scenarioTwoSimple(AgreementReputationSystem gc) {
+    @Test(expected=NoSuchElementException.class)
+    public void setDisagreementException() {
+        CollusionReputationSystem crs = new CollusionReputationSystem();
+        crs.addAllWorkers(workers);
+        crs.removeAllWorkers(addElement(worker, new HashSet<Worker>()));
+        crs.setDisagreement(new Job() {}, worker, workers);
+    }
+
+    @Test public void setDistinctSets() {
+        CollusionReputationSystem crs = new CollusionReputationSystem();
+        Job job = new Job() {};
+        crs.addAllWorkers(workers);
+        crs.setAgreement(job, worker, workers);
+        crs.setDistinctSets(job, workers, new HashSet<Set<Worker>>());
+    }
+
+    @Test(expected=NoSuchElementException.class)
+    public void setDistinctSetsException() {
+        CollusionReputationSystem crs = new CollusionReputationSystem();
+        crs.setDistinctSets(new Job() {}, workers, new HashSet<Set<Worker>>());
+    }
+
+    @Test public void getCollusionLikelihood() {
+        CollusionReputationSystem crs = new CollusionReputationSystem();
+        crs.addAllWorkers(workers);
+        Estimator collusion = crs.getCollusionLikelihood(workers);
+        assertEquals(0.5d, collusion.getEstimate(), EPSILON);
+        Map<Worker,Estimator> map = crs.getCollusionLikelihood(worker, workers);
+        for (Worker w : map.keySet())
+            if (w != worker)
+                assertTrue("Error too low: " + map.get(w).getError(),
+                        map.get(w).getError() > MIN_ERROR);
+        Estimator fraction = crs.getColludersFraction();
+        assertTrue("Error too low: " + fraction.getError(),
+                fraction.getError() > MIN_ERROR);
+    }
+
+    @Test public void scenarioSimple() {
+        /* Initializations and declarations */
+        CollusionReputationSystem crs = new CollusionReputationSystem();
+        Set<Worker> workersTwo = new HashSet<Worker>();
+        workersTwo.addAll(workersList.get(0));
+        workersTwo.addAll(workersList.get(1));
+        crs.addAllWorkers(workersTwo);
+        /* Scenario with two sets */
+        Random rand = new Random(0L);
         for (int i=0; i<200; i++) {
             Job job = new Job() {};
-            int[] answers = null;
-            switch (i % 2) {
-                case 0:
-                    answers = new int[] {0, 0};
-                    break;
-                case 1:
-                    answers = new int[] {0, 1};
-                    break;
-            }
-            for (int k=0; k<2; k++)
-                for (int j=k; j<2; j++)
-                    if (answers[k] == answers[j])
-                        setAgreement(gc, job, workersList.get(k),
-                                workersList.get(j));
-                    else
-                        setDisagreement(gc, job, workersList.get(k),
-                                workersList.get(j));
-        }
-    }
-
-    @Test public void getCollusionLikelihoodTwoSimple() {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        Set<Worker> workersTwo = new HashSet<Worker>();
-        workersTwo.addAll(workersList.get(0));
-        workersTwo.addAll(workersList.get(1));
-        gc.addAllWorkers(workersTwo);
-        scenarioTwoSimple(gc);
-        Set<Worker> set = new HashSet<Worker>();
-        set.addAll(workersList.get(1));
-        assertEquals(0.5d, gc.getCollusionLikelihood(set).getEstimate(),
-                EPSILON);
-        set.addAll(workersList.get(0));
-        assertEquals(0.0d, gc.getCollusionLikelihood(set).getEstimate(),
-                EPSILON);
-    }
-
-    private static void scenarioTwo(AgreementReputationSystem gc) {
-        Random rand = new Random(0L);
-        for (int i=0; i<80; i++) {
-            Job job = new Job() {};
-            setAgreement(gc, job, workersList.get(0), workersList.get(0));
-            setAgreement(gc, job, workersList.get(1), workersList.get(1));
+            Result correct = new Result() {};
+            Result bad = new Result() {};
+            for (Worker worker1 : workersList.get(0))
+                crs.setWorkerResult(worker1, job, correct);
             if (rand.nextBoolean())
-                setAgreement(gc, job, workersList.get(0), workersList.get(1));
+                for (Worker worker2 : workersList.get(1))
+                    crs.setWorkerResult(worker2, job, correct);
             else
-                setDisagreement(gc, job, workersList.get(0),
-                        workersList.get(1));
+                for (Worker worker2 : workersList.get(1))
+                    crs.setWorkerResult(worker2, job, bad);
+            crs.setCertifiedResult(job, correct);
         }
+        /* Test collusion estimations */
+        Estimator collusion1 = crs.getCollusionLikelihood(workersList.get(0));
+        assertEquals(0.0d, collusion1.getEstimate(), EPSILON);
+        Estimator collusion2 = crs.getCollusionLikelihood(workersList.get(1));
+        assertEquals(0.5d, collusion2.getEstimate(), collusion2.getError());
+        Estimator collusion3 = crs.getCollusionLikelihood(workersTwo);
+        assertEquals(0.0d, collusion3.getEstimate(), EPSILON);
     }
 
-    @Test public void getCollusionLikelihoodTwo() {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        Set<Worker> workersTwo = new HashSet<Worker>();
-        workersTwo.addAll(workersList.get(0));
-        workersTwo.addAll(workersList.get(1));
-        gc.addAllWorkers(workersTwo);
-        scenarioTwo(gc);
-        Set<Worker> set = new HashSet<Worker>();
-        set.addAll(workersList.get(1));
-        assertEquals(0.5d, gc.getCollusionLikelihood(set).getEstimate(),
-                BIG_EPSILON);
-        set.addAll(workersList.get(0));
-        assertEquals(0.0d, gc.getCollusionLikelihood(set).getEstimate(), EPSILON);
-    }
-
-    private static int[][] generateAnswer(int n, int k) {
-        int[][] scheme = new int[][] {
+    @Test public void scenario() {
+        /* Initializations and declarations */
+        CollusionReputationSystem crs = new CollusionReputationSystem();
+        crs.addAllWorkers(workers);
+        final int[][] scheme = new int[][] {
                 {0, 0, 0, 2, 2, 0},
                 {0, 0, 1, 1, 0, 1},
                 {0, 1, 1, 0, 0, 1},
@@ -143,99 +133,54 @@ public class TestCollusionReputationSystem {
                 {0, 0, 0, 0, 2, 0},
                 {0, 0, 0, 0, 2, 2},
                 {0, 1, 1, 0, 0, 0},
-                {0, 0, 0, 2, 2, 2},
                 {0, 0, 1, 1, 2, 0},
+                {0, 0, 0, 2, 2, 2},
                 {0, 1, 0, 1, 0, 0} };
-        int[][] answers = new int[n][k];
-        for (int i=0; i<n; i++)
-            for (int j=0; j<k; j++)
-                answers[i][j] = scheme[i%scheme.length][j];
-        return answers;
-    }
-
-    private static AgreementReputationSystem scenario(int setNumber) {
-        AgreementReputationSystem gc
-            = new AgreementReputationSystem();
-        gc.addAllWorkers(workers);
-        final int n = 100;
-        int[][] answers = generateAnswer(n, setNumber);
-        for (int i=0; i<n; i++) {
+        /* Scenario */
+        for (int i=0; i<200; i++) {
             Job job = new Job() {};
-            for (int j=0; j<setNumber; j++)
-                for (int k=j; k<setNumber; k++)
-                    if (answers[i][k] == answers[i][j])
-                        setAgreement(gc, job, workersList.get(k),
-                                workersList.get(j));
-                    else
-                        setDisagreement(gc, job, workersList.get(k),
-                                workersList.get(j));
+            final Result[] results = new Result[3];
+            for (int j=0; j<results.length; j++)
+                results[j] = new Result() {};
+            for (int j=0; j<workersList.size(); j++)
+                for (Worker w : workersList.get(j))
+                    crs.setWorkerResult(w, job, results[scheme[i%scheme.length][j]]);
+            crs.setCertifiedResult(job, results[0]);
         }
-        return gc;
+        /* Test collusion estimations */
+        Set<Worker> set = new HashSet<Worker>();
+        /* First case */
+        set.addAll(workersList.get(1));
+        set.addAll(workersList.get(2));
+        Estimator collusion1 = crs.getCollusionLikelihood(set);
+        assertEquals(0.2d, collusion1.getEstimate(), EPSILON);
+        /* Second case */
+        set.clear();
+        set.addAll(workersList.get(3));
+        set.addAll(workersList.get(5));
+        Estimator collusion2 = crs.getCollusionLikelihood(set);
+        assertEquals(0.2d, collusion2.getEstimate(), EPSILON);
+        /* Third case (this value should be 0.0d, but we do our best) */
+        set.clear();
+        set.addAll(workersList.get(1));
+        set.addAll(workersList.get(2));
+        set.addAll(workersList.get(3));
+        Estimator collusion3 = crs.getCollusionLikelihood(set);
+        assertEquals(0.2d, collusion3.getEstimate(), EPSILON);
+        /* Fourth case */
+        set.clear();
+        set.addAll(workersList.get(1));
+        set.addAll(workersList.get(2));
+        set.addAll(workersList.get(5));
+        Estimator collusion4 = crs.getCollusionLikelihood(set);
+        assertEquals(0.1d, collusion4.getEstimate(), EPSILON);
+        /* Fith case (this value should be 0.1d, but we do our best) */
+        set.clear();
+        set.addAll(workersList.get(3));
+        set.addAll(workersList.get(4));
+        set.addAll(workersList.get(5));
+        Estimator collusion5 = crs.getCollusionLikelihood(set);
+        assertEquals(0.2d, collusion5.getEstimate(), EPSILON);
     }
-
-    private static void scenarios() {
-        for (int i=1; i<=6; i++)
-            gcs.add(scenario(i));
-    }
-
-    @Test public void getCollusionLikelihood1() {
-        for (int i=2; i<6; i++) {
-            Set<Worker> set = new HashSet<Worker>();
-            set.addAll(workersList.get(1));
-            set.addAll(workersList.get(2));
-            assertEquals(0.2d, gcs.get(i).getCollusionLikelihood(set)
-                    .getEstimate(), EPSILON);
-        }
-    }
-
-    @Test public void getCollusionLikelihood2() {
-        for (int i=5; i<6; i++) {
-            Set<Worker> set = new HashSet<Worker>();
-            set.addAll(workersList.get(3));
-            set.addAll(workersList.get(5));
-            assertEquals(0.2d, gcs.get(i).getCollusionLikelihood(set)
-                    .getEstimate(), EPSILON);
-        }
-    }
-
-    @Test public void getCollusionLikelihood3() {
-        for (int i=3; i<6; i++) {
-            Set<Worker> set = new HashSet<Worker>();
-            set.addAll(workersList.get(1));
-            set.addAll(workersList.get(2));
-            set.addAll(workersList.get(3));
-*/
-            /* This value should be 0.0d, but we do our best */
-/*
-            assertEquals(0.2d, gcs.get(i).getCollusionLikelihood(set)
-                    .getEstimate(), EPSILON);
-        }
-    }
-
-    @Test public void getCollusionLikelihood4() {
-        for (int i=5; i<6; i++) {
-            Set<Worker> set = new HashSet<Worker>();
-            set.addAll(workersList.get(1));
-            set.addAll(workersList.get(2));
-            set.addAll(workersList.get(5));
-            assertEquals(0.1d, gcs.get(i).getCollusionLikelihood(set)
-                    .getEstimate(), EPSILON);
-        }
-    }
-
-    @Test public void getCollusionLikelihood5() {
-        for (int i=5; i<6; i++) {
-            Set<Worker> set = new HashSet<Worker>();
-            set.addAll(workersList.get(3));
-            set.addAll(workersList.get(4));
-            set.addAll(workersList.get(5));
-*/
-            /* This value should be 0.1d, but we do our best */
-/*
-            assertEquals(0.2d, gcs.get(i).getCollusionLikelihood(set)
-                    .getEstimate(), EPSILON);
-        }
-    }
-*/
 
 }

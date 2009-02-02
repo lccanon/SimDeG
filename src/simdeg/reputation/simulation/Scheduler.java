@@ -103,7 +103,6 @@ public class Scheduler {
     /**
      * Get current worker according to a weighted uniform method.
      */
-    //TODO switch to a deterministic method
     private Worker getWorker(Map<Worker,Double> heterogeneity) {
         double total = RandomManager.getRandom("scheduling").nextDouble();
         for (Worker worker : jobsQueue.keySet()) {

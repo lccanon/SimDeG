@@ -61,7 +61,7 @@
       <batchtest fork="yes" todir="${report-dir}">
         <formatter type="xml"/>
         <fileset dir="${build-dir}">
-          <include name="**/reputation/TestC*M*.class"/>
+          <include name="**/Test*.class"/>
           <exclude name="**/Test*$*.class"/>
         </fileset>
       </batchtest>
