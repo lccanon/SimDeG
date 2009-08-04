@@ -1,6 +1,5 @@
 package simdeg.scheduling;
 
-
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,9 +10,10 @@ import java.util.logging.Logger;
 
 import simdeg.reputation.Worker;
 import simdeg.util.Collections;
-import simdeg.util.Estimator;
+import simdeg.util.RV;
 import simdeg.util.UnaryLUT;
 import simdeg.util.RandomManager;
+
 import flanagan.analysis.Stat;
 
 /**
@@ -99,11 +99,11 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
      * Computes the minimal size for groups with the current fraction.
      */
     private int minimumGroupSize() {
-        final Estimator fraction
+        final RV fraction
                 = reputationSystem.getColludersFraction();
             if (fraction.getError() > MAX_ERROR)
                 throw new RuntimeException();
-        return minSizeValues.getValue(fraction.getEstimate());
+        return minSizeValues.getValue(fraction.getMean());
     }
 
     /**
@@ -149,7 +149,7 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
         candidateWorkers.removeAll(workers);
         final Worker worker = Collections.getRandomSubGroup(1, workers,
                 RandomManager.getRandom("scheduling")).iterator().next();
-        final Map<Worker,Estimator> collusion = this.reputationSystem
+        final Map<Worker, RV> collusion = this.reputationSystem
             .getCollusionLikelihood(worker, candidateWorkers);
 
         /* Compute each score */
@@ -161,7 +161,7 @@ public class GreedyGracefulResourcesGrouper extends ResourcesGrouper {
                 return Collections.addElement(otherWorker,
                         new HashSet<Worker>());
             final double currentScore
-                = (1.0d - collusion.get(otherWorker).getEstimate())
+                = (1.0d - collusion.get(otherWorker).getMean())
                 * (1.0d - collusion.get(otherWorker).getError());
             score.put(otherWorker, currentScore);
             total += currentScore;

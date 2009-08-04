@@ -1,7 +1,7 @@
 package simdeg.reputation;
 
-import simdeg.util.BTS;
-import simdeg.util.Estimator;
+import simdeg.util.BetaEstimator;
+import simdeg.util.RV;
 import simdeg.util.OutOfRangeException;
 
 import java.util.Set;
@@ -14,42 +14,55 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import static org.junit.Assert.*;
 
+/* TODO add test
+ * Test that most of merges happen with small sets and slow down when the
+ * biggest size increases.
+ * Test that splits happen when set are smalls and decrease after.
+ */
 public class TestAgreementMatrix {
 
     private static Set<Worker> workers1;
     private static Set<Worker> workers2;
     private static Set<Worker> workers;
 
-    private static final double EPSILON = 1E-2d;
+    private static final double LARGE_EPSILON = 1E-1d;
+    private static final double BIG_EPSILON = 1E-2d;
+    private static final double EPSILON = 1E-5d;
 
     private AgreementMatrix matrix;
 
     @BeforeClass public static void createWorkers() {
         workers1 = new HashSet<Worker>();
-        for (int i=0; i<10; i++)
-            workers1.add(new Worker() {});
+        for (int i=0; i<10; i++) {
+            final int hash = i * 2;
+            workers1.add(new Worker() {public int hashCode() {
+                    return hash; }/*public String toString(){return "1";}*/});
+        }
         workers2 = new HashSet<Worker>();
-        for (int i=0; i<29; i++)
-            workers2.add(new Worker() {});
+        for (int i=0; i<29; i++) {
+            final int hash = i * 2 + 1;
+            workers2.add(new Worker() {public int hashCode() {
+                    return hash; }/*public String toString(){return "2";}*/});
+        }
         workers = new HashSet<Worker>();
         workers.addAll(workers1);
         workers.addAll(workers2);
     }
 
     @Before public void createMatrix() {
-        matrix = new AgreementMatrix(new BTS(1.0d));
+        matrix = new AgreementMatrix(new BetaEstimator(1.0d));
     }
 
-    private void checkFirstLine(Estimator[][] agreement) {
+    private void checkFirstLine(RV[][] agreement) {
         double max = 0.0d;
         for (int j=0; j<agreement[0].length; j++)
-            max = Math.max(max, agreement[0][j].getEstimate());
-        assertEquals(max, 1.0d, EPSILON);
+            max = Math.max(max, agreement[0][j].getMean());
+        assertEquals(1.0d, max, BIG_EPSILON);
     }
 
     @Test(expected=OutOfRangeException.class)
     public void agreementMatrixException() {
-        new AgreementMatrix(new BTS(0.0d));
+        new AgreementMatrix(new BetaEstimator(0.0d));
     }
 
     @Test public void merge() {
@@ -68,11 +81,11 @@ public class TestAgreementMatrix {
                 }
         }
         assertEquals(29, matrix.getBiggest().size());
-        Estimator[][] agreement = matrix.getAgreements(workers);
+        RV[][] agreement = matrix.getAgreements(workers);
         assertEquals(2, agreement.length);
         checkFirstLine(agreement);
-        assertEquals(1.0d, agreement[1][0].getEstimate(), EPSILON);
-        assertEquals(0.0d, agreement[1][1].getEstimate(), EPSILON);
+        assertEquals(1.0d, agreement[1][0].getMean(), BIG_EPSILON);
+        assertEquals(0.0d, agreement[1][1].getMean(), BIG_EPSILON);
     }
 
     @Test public void split() {
@@ -93,15 +106,15 @@ public class TestAgreementMatrix {
                 for (Worker otherWorker : workers)
                     matrix.decreaseAgreement(worker, otherWorker);
         assertEquals(1, matrix.getBiggest().size());
-        Estimator[][] agreement = matrix.getAgreements(workers);
+        RV[][] agreement = matrix.getAgreements(workers);
         assertEquals(39, agreement.length);
         checkFirstLine(agreement);
         for (int i=1; i<agreement.length; i++)
             for (int j=0; j<agreement[i].length; j++)
                 if (i == j+1)
-                    assertEquals(1.0d, agreement[i][j].getEstimate(), EPSILON);
+                    assertEquals(1.0d, agreement[i][j].getMean(), BIG_EPSILON);
                 else
-                    assertEquals(0.0d, agreement[i][j].getEstimate(), EPSILON);
+                    assertEquals(0.0d, agreement[i][j].getMean(), BIG_EPSILON);
     }
 
     @Test public void getAgreementsSimple() {
@@ -121,12 +134,12 @@ public class TestAgreementMatrix {
                         matrix.decreaseAgreement(worker, otherWorker);
                 }
         }
-        Estimator[][] agreement = matrix.getAgreements(workers);
+        RV[][] agreement = matrix.getAgreements(workers);
         checkFirstLine(agreement);
         assertEquals(29, matrix.getBiggest().size());
         assertEquals(2, agreement.length);
-        assertEquals(1.0d, agreement[1][0].getEstimate(), EPSILON);
-        assertEquals(0.5d, agreement[1][1].getEstimate(), EPSILON);
+        assertEquals(1.0d, agreement[1][0].getMean(), BIG_EPSILON);
+        assertEquals(0.5d, agreement[1][1].getMean(), BIG_EPSILON);
     }
 
     @Test public void getAgreements() {
@@ -147,12 +160,12 @@ public class TestAgreementMatrix {
                         matrix.decreaseAgreement(worker, otherWorker);
                 }
         }
-        Estimator[][] agreement = matrix.getAgreements(workers);
+        RV[][] agreement = matrix.getAgreements(workers);
         checkFirstLine(agreement);
         assertEquals(29, matrix.getBiggest().size());
         assertEquals(2, agreement.length);
-        assertEquals(1.0d, agreement[1][0].getEstimate(), EPSILON);
-        assertEquals(0.5d, agreement[1][1].getEstimate(), 10.0d * EPSILON);
+        assertEquals(1.0d, agreement[1][0].getMean(), BIG_EPSILON);
+        assertEquals(0.5d, agreement[1][1].getMean(), LARGE_EPSILON);
     }
 
     @Test(expected=NoSuchElementException.class)

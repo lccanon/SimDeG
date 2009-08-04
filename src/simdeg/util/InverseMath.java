@@ -5,7 +5,7 @@ import flanagan.analysis.Stat;
 final class InverseMath {
 
     /**
-     * Computes the inverse of the inverse standard normal cumulative distribution function.
+     * Computes the inverse of the standard normal cumulative distribution function.
      * The algorithm uses two separate rational minimax approximations.
      */
     public static final double inverseStandardNormal(double p) {
@@ -48,7 +48,7 @@ final class InverseMath {
     }
 
     /**
-     * Computes the inverse of the inverse normal cumulative distribution function.
+     * Computes the inverse of the normal cumulative distribution function.
      */
     public static final double inverseNormal(double p, double mean, double variance) {
         /* Test for admissibility of parameters */
@@ -59,6 +59,9 @@ final class InverseMath {
         return mean + stdDev * inverseStandardNormal(p);
     }
 
+    /**
+     * Computes the inverse of the incomplete Beta function.
+     */
     public static final double inverseIncompleteBeta(double alpha, double p, double q) {
         final double CONST1 = 2.30753d;
         final double CONST2 = 0.27061d;

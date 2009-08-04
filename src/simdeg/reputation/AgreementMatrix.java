@@ -5,26 +5,25 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.logging.Logger;
 
+import simdeg.util.RV;
 import simdeg.util.Estimator;
 import simdeg.util.DynamicMatrix;
 import simdeg.util.OutOfRangeException;
 
-final class AgreementMatrix extends DynamicMatrix<Worker> {
+//class AgreementMatrix extends DynamicMatrix<Worker> {
+public class AgreementMatrix extends DynamicMatrix<Worker> {
 
     /** Logger */
     private static final Logger logger
         = Logger.getLogger(AgreementMatrix.class.getName());
 
-    /**
-     * Threshold below which a group is considering to not collude. It implies
-     * that the error is not much than a function of this value. */
-    private static final double AGREEMENT_THRESHOLD = 0.99d;
-
     protected AgreementMatrix(Estimator estimatorBase) {
         super(estimatorBase);
         /* Test wether the default estimator was correctly initialized */
-        if (estimatorBase.getEstimate() < 1.0d - estimatorBase.DEFAULT_ERROR || estimatorBase.getEstimate() > 1.0d)
-            throw new OutOfRangeException(estimatorBase.getEstimate(), 1.0d - estimatorBase.DEFAULT_ERROR, 1.0d);
+        if (estimatorBase.getMean() < 1.0d - estimatorBase.DEFAULT_ERROR
+                || estimatorBase.getMean() > 1.0d)
+            throw new OutOfRangeException(estimatorBase.getMean(),
+                    1.0d - estimatorBase.DEFAULT_ERROR, 1.0d);
     }
 
     protected final void increaseAgreement(Worker worker, Worker otherWorker) {
@@ -35,7 +34,10 @@ final class AgreementMatrix extends DynamicMatrix<Worker> {
         /* Update estimator */
         getEstimator(set1, set2).setSample(1.0d);
         /* Test the possibility of merging both sets */
-        if (set1 != set2 && getEstimator(set1, set2).getEstimate() > AGREEMENT_THRESHOLD)
+        if (set1 != set2 && getEstimator(set1, set2).getMean()
+                > 1.0d - 1.0d / (2.0d + set1.size() + set2.size())
+                && getEstimator(set1, set2).getMean()
+                > 1.0d - getEstimator(set1, set2).getError())
             merge(set1, set2);
     }
 
@@ -56,9 +58,9 @@ final class AgreementMatrix extends DynamicMatrix<Worker> {
     }
 
     @SuppressWarnings("unchecked")
-    protected final Estimator[][] getAgreements(Set<? extends Worker> workers) {
+    protected final RV[][] getAgreements(Set<? extends Worker> workers) {
         final List<Set<Worker>> sets = new ArrayList<Set<Worker>>(getSets(workers));
-        Estimator[][] result = new Estimator[sets.size()][sets.size()];
+        RV[][] result = new RV[sets.size()][sets.size()];
         for (int j=0; j<result[0].length; j++)
             result[0][j] = getEstimator(getBiggest(), sets.get(j));
         for (int i=1; i<result.length; i++)

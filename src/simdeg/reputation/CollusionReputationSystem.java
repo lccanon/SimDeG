@@ -1,10 +1,10 @@
 package simdeg.reputation;
 
 import static simdeg.util.Collections.addElement;
-import static simdeg.util.Estimator.add;
-import static simdeg.util.Estimator.max;
-import static simdeg.util.Estimator.min;
-import static simdeg.util.Estimator.subtract;
+import static simdeg.util.RV.add;
+import static simdeg.util.RV.max;
+import static simdeg.util.RV.min;
+import static simdeg.util.RV.subtract;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,8 +13,9 @@ import java.util.Set;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 
-import simdeg.util.BTS;
-import simdeg.util.Estimator;
+import simdeg.util.RV;
+import simdeg.util.Beta;
+import simdeg.util.BetaEstimator;
 
 /**
  * Strategy considering failures and collusion with convergence.
@@ -25,15 +26,8 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	private static final Logger logger = Logger
 			.getLogger(CollusionReputationSystem.class.getName());
 
-	private final CollusionMatrix collusion = new CollusionMatrix(new BTS());
-
-	/**
-	 * Keep track of each update made on the CollusionMatrix (nice structure).
-	 * For each job, the set of pairs of internal set to the AgreementMatrix is
-	 * stored. This allows to avoid long sequence of similar events which would
-     * pertube the estimators.
-	 */
-	private final Map<Job, Set<Set<Set<Worker>>>> updatedSets = new HashMap<Job, Set<Set<Set<Worker>>>>();
+	private final CollusionMatrix collusion
+        = new CollusionMatrix(new BetaEstimator());
 
 	/**
 	 * Gives participating workers.
@@ -57,7 +51,7 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	protected void setAgreement(Job job, Worker worker, Set<Worker> workers) {
 		assert (!workers.isEmpty()) : "Not enough workers in group";
 		if (!updatedSets.containsKey(job))
-			updatedSets.put(job, new HashSet<Set<Set<Worker>>>());
+			updatedSets.put(job, new HashMap<Set<Worker>, Set<Set<Worker>>>());
 	}
 
 	/**
@@ -66,27 +60,28 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	protected void setDisagreement(Job job, Worker worker, Set<Worker> workers) {
 		assert (workers.size() > 1) : "Not enough workers in group";
 		if (!updatedSets.containsKey(job))
-			updatedSets.put(job, new HashSet<Set<Set<Worker>>>());
+			updatedSets.put(job, new HashMap<Set<Worker>, Set<Set<Worker>>>());
         final Set<Worker> setWorker = collusion.getSet(worker);
         /* Split the workers from every set with which it disagrees */
-        for (Worker otherWorker : workers)
-            if (setWorker == collusion.getSet(otherWorker)) {
-                final Set<Worker> biggest = collusion.getBiggest();
-                collusion.split(setWorker, worker);
-                /* Test wether to readapt or not */
-                if (biggest != collusion.getBiggest())
-                    collusion.readapt();
-            }
-        /* Update each element in the collusion matrix only once per computed job */
         for (Worker otherWorker : workers) {
             final Set<Worker> setOtherWorker = collusion.getSet(otherWorker);
-            Set<Set<Worker>> pair = new HashSet<Set<Worker>>();
-            pair.add(setWorker);
-            pair.add(setOtherWorker);
-            if (!updatedSets.get(job).contains(pair)
-                    || setWorker == setOtherWorker) {
+            if (setWorker == setOtherWorker) {
+                final Set<Worker> previousBiggest = collusion.getBiggest();
+                collusion.split(setWorker, worker);
+                /* Readapt if needed */
+                collusion.readapt(previousBiggest);
+                /* Update the interaction structure */
+                adaptInteractionStructure(job, setWorker, setOtherWorker,
+                    collusion.getSet(worker), collusion.getSet(otherWorker));
+            }
+        }
+        for (Worker otherWorker : workers) {
+            final Set<Worker> setOtherWorker = collusion.getSet(otherWorker);
+            if (updateInteraction(job, worker, otherWorker,
+                        setWorker, setOtherWorker)) {
                 collusion.decreaseCollusion(worker, otherWorker);
-                updatedSets.get(job).add(pair);
+                adaptInteractionStructure(job, setWorker, setOtherWorker,
+                        collusion.getSet(worker), collusion.getSet(otherWorker));
             }
         }
 	}
@@ -98,46 +93,43 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	protected void setDistinctSets(Job job, Set<Worker> winningWorkers,
 			Set<Set<Worker>> workers) {
         assert (!winningWorkers.isEmpty()) : "No winning workers";
-        /* Stores the set of each other workers, because their constitutions
-         * could variate at each call to decreaseCollusion or increaseCollusion.
-         * It allows to limit the number of updates by keeping track of initial
-         * sets. */
-        final Map<Worker, Set<Worker>> setsOtherWorker = new HashMap<Worker, Set<Worker>>();
-        for (Worker otherWorker : winningWorkers)
-            setsOtherWorker.put(otherWorker, collusion.getSet(otherWorker));
-        for (Set<Worker> workersSet : workers)
-            for (Worker otherWorker : workersSet)
-                setsOtherWorker.put(otherWorker, collusion.getSet(otherWorker));
-        /* Observed collusion */
-        for (Set<Worker> workersSet : workers)
-            for (Worker worker : workersSet) {
-                final Set<Worker> setWorker = collusion.getSet(worker);
-                /* Update each element in the collusion matrix only once per computed job */
-                for (Worker otherWorker : workersSet) {
-                    final Set<Worker> setOtherWorker = setsOtherWorker.get(otherWorker);
-                    Set<Set<Worker>> pair = new HashSet<Set<Worker>>();
-                    pair.add(setWorker);
-                    pair.add(setOtherWorker);
-                    if (!updatedSets.get(job).contains(pair)) {
-                        collusion.increaseCollusion(worker, otherWorker);
-                        updatedSets.get(job).add(pair);
-                    }
-                }
-            }
         /* Non-colluders */
+        /* Begin with diagonal */
         for (Worker worker : winningWorkers) {
             final Set<Worker> setWorker = collusion.getSet(worker);
-            /* Update each element in the collusion matrix only once per computed job */
+            if (updateInteraction(job, worker, worker, setWorker, setWorker))
+                collusion.decreaseCollusion(worker, worker);
+        }
+        for (Worker worker : winningWorkers)
             for (Worker otherWorker : winningWorkers) {
-                final Set<Worker> setOtherWorker = setsOtherWorker.get(otherWorker);
-                Set<Set<Worker>> pair = new HashSet<Set<Worker>>();
-                pair.add(setWorker);
-                pair.add(setOtherWorker);
-                if (!updatedSets.get(job).contains(pair)) {
+                final Set<Worker> setWorker = collusion.getSet(worker);
+                final Set<Worker> setOtherWorker = collusion.getSet(otherWorker);
+                if (updateInteraction(job, worker, otherWorker,
+                            setWorker, setOtherWorker)) {
                     collusion.decreaseCollusion(worker, otherWorker);
-                    updatedSets.get(job).add(pair);
+                    adaptInteractionStructure(job, setWorker, setOtherWorker,
+                        collusion.getSet(worker), collusion.getSet(otherWorker));
                 }
             }
+        /* Observed collusion */
+        for (Set<Worker> workersSet : workers) {
+            /* Begin with diagonal */
+            for (Worker worker : workersSet) {
+                final Set<Worker> setWorker = collusion.getSet(worker);
+                if (updateInteraction(job, worker, worker, setWorker, setWorker))
+                    collusion.increaseCollusion(worker, worker);
+            }
+            for (Worker worker : workersSet)
+                for (Worker otherWorker : workersSet) {
+                    final Set<Worker> setWorker = collusion.getSet(worker);
+                    final Set<Worker> setOtherWorker = collusion.getSet(otherWorker);
+                    if (updateInteraction(job, worker, otherWorker,
+                            setWorker, setOtherWorker)) {
+                        collusion.increaseCollusion(worker, otherWorker);
+                        adaptInteractionStructure(job, setWorker, setOtherWorker,
+                                collusion.getSet(worker), collusion.getSet(otherWorker));
+                    }
+                }
         }
 		updatedSets.remove(job);
 	}
@@ -146,14 +138,14 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	 * Returns the estimated likelihood that a given group of workers give the
 	 * same result.
 	 */
-	public Estimator getCollusionLikelihood(Set<? extends Worker> workers) {
-		final Estimator[][] proba = collusion.getCollusions(workers);
-		Estimator estimator = new BTS(1.0d);
+	public RV getCollusionLikelihood(Set<? extends Worker> workers) {
+		final RV[][] proba = collusion.getCollusions(workers);
+		RV estimator = new Beta(1.0d);
 		for (int i = 0; i < proba.length; i++)
 			for (int j = i; j < proba[i].length; j++)
 				estimator = min(estimator, proba[i][j]);
-		assert (estimator.getEstimate() >= 0.0d) : "Negative estimate: "
-				+ estimator.getEstimate();
+		assert (estimator.getMean() >= 0.0d) : "Negative estimate: "
+				+ estimator.getMean();
 
 		logger.finest("Estimated collusion likelihood of " + workers.size()
 				+ " workers is " + estimator);
@@ -164,9 +156,9 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	 * Returns the estimated likelihoods that a worker will return the same
 	 * wrong result than each other.
 	 */
-	public <W extends Worker> Map<W, Estimator> getCollusionLikelihood(W worker,
+	public <W extends Worker> Map<W, RV> getCollusionLikelihood(W worker,
 			Set<W> workers) {
-		Map<W, Estimator> result = new HashMap<W, Estimator>();
+		Map<W, RV> result = new HashMap<W, RV>();
 		Set<W> set = addElement(worker, new HashSet<W>());
 		for (W otherWorker : workers) {
 			set.add(otherWorker);
@@ -182,10 +174,16 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	 * Returns the estimated fraction of colluders (workers returning together
 	 * the same wrong result).
 	 */
-	public Estimator getColludersFraction() {
+	public RV getColludersFraction() {
 		final Set<Worker> biggest = collusion.getBiggest();
 		final double fraction = 1.0d - (double) biggest.size() / workers.size();
-		final Estimator result = new BTS(fraction, collusion.getBiggestError());
+		final RV result = new RV(0.0d, 1.0d) {
+            double error = collusion.getBiggestError();
+            public RV clone() { return null; }
+            public double getMean() { return fraction; }
+            protected double getVariance() { return 0.0d; }
+            public double getError() { return error; }
+        };
 		logger.finer("Estimated fraction of colluders: " + result);
 		return result;
 	}
@@ -193,5 +191,9 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
     public String toString() {
         return "collusion-based reputation system";
     }
+
+    protected void print() {
+        collusion.print();
+    }    
 
 }

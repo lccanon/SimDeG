@@ -4,7 +4,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import simdeg.util.Estimator;
+import simdeg.util.RV;
 
 /**
  * Stores and handles all observations relative to the Desktop grids on which we
@@ -37,6 +37,6 @@ public interface BasicReputationSystem {
 	/**
 	 * Returns the estimated reliability of the worker.
 	 */
-	public abstract Estimator getReliability(Worker worker);
+	public abstract RV getReliability(Worker worker);
 
 }

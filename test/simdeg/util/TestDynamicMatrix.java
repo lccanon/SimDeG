@@ -20,11 +20,15 @@ public class TestDynamicMatrix {
 
     @BeforeClass public static void createObjects() {
         objects1 = new HashSet<Object>();
-        for (int i=0; i<10; i++)
-            objects1.add(new Object());
+        for (int i=0; i<10; i++) {
+            final int hash = i * 2;
+            objects1.add(new Object() {public int hashCode() { return hash; }});
+        }
         objects2 = new HashSet<Object>();
-        for (int i=0; i<29; i++)
-            objects2.add(new Object());
+        for (int i=0; i<29; i++) {
+            final int hash = i * 2 + 1;
+            objects2.add(new Object() {public int hashCode() { return hash; }});
+        }
         objects = new HashSet<Object>();
         objects.addAll(objects1);
         objects.addAll(objects2);
@@ -81,9 +85,9 @@ public class TestDynamicMatrix {
         final Set<Set<Object>> sets1 = matrix.getSets(objects1);
         assertEquals(objects1.size(), sets1.size());
         /* Perform merges of all objects from first set */
-        final Object object = objects1.iterator().next();
-        for (Set<Object> set : sets1)
-            matrix.merge(matrix.getSet(object), set);
+        final Object object1 = objects1.iterator().next();
+        for (Object object : objects1)
+            matrix.merge(matrix.getSet(object1), matrix.getSet(object));
         final Set<Set<Object>> sets1AfterMerge = matrix.getSets(objects1);
         assertEquals(1, sets1AfterMerge.size());
     }

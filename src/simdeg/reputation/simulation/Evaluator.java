@@ -11,7 +11,7 @@ import java.util.logging.Logger;
 
 import simdeg.reputation.ReputationSystem;
 import simdeg.util.Switcher;
-import simdeg.util.Estimator;
+import simdeg.util.RV;
 import simdeg.util.OutOfRangeException;
 
 /**
@@ -136,14 +136,18 @@ class Evaluator {
         if (step == 0)
             logger.info("Step,collusion RMSD,reliability RMSD,fraction RMSD,"
                     + "collusion error RMSD,reliability error RMSD,"
-                    + "fraction error RMSD, collusion error correlation,"
+                    + "fraction error RMSD" + /*", collusion error correlation,"
                     + "reliability error correlation,collusion false negative,"
                     + "reliability false negative,fraction false negative,"
                     + "collusion smoothness,reliability smoothness,"
-                    + "fraction smoothness,simulation time");
+                    + "fraction smoothness" + */",simulation time");
+
+        if (step != 100 && step != 300 && step != 1000 && step != 3000 && step != 10000
+                && step != 30000 && step != 100000 && step != 300000 && step != 1000000)
+            return;
 
         /* Retrieve the values from the reputation system */
-        getEstimatedValues();
+        getMeandValues();
 
         /* Compute main metrics related to accuracy */
         computeErrorsCollusion(step);
@@ -151,23 +155,23 @@ class Evaluator {
         computeErrorsFraction(step);
 
         /* Measures the adaptiveness quality of the system */
-        measureAdaptiveness(step);
+        //measureAdaptiveness(step);
 
         /* Handles the smoothness metric */
-        measureSmoothness(step);
-        previousBugging = estimatedBugging;
-        previousReliability = estimatedReliability;
-        previousFraction = estimatedFraction;
+        //measureSmoothness(step);
+        //previousBugging = estimatedBugging;
+        //previousReliability = estimatedReliability;
+        //previousFraction = estimatedFraction;
 
         logger.info(String.format("%d,%12g,%12g,%12g,%12g,%12g,%12g,"
-                    + "%12g,%12g,%d,%d,%d,%12g,%12g,%12g,%12g", step,
+                    /*+ "%12g,%12g,%d,%d,%d,%12g,%12g,%12g,"*/ + "%12g", step,
                     RMSDc[step], RMSDr[step], RMSDa[step], RMSDec[step],
-                    RMSDer[step], RMSDea[step], corrEc[step], corrEr[step],
+                    RMSDer[step], RMSDea[step], /*corrEc[step], corrEr[step],
                     falseNegativeC[step], falseNegativeR[step],
                     falseNegativeA[step], smoothC[step], smoothR[step],
-                    smoothA[step], (System.currentTimeMillis() - startTime) * 1E-3d));
+                    smoothA[step],*/ (System.currentTimeMillis() - startTime) * 1E-3d));
 
-        if (step + 1 == stepsNumber) {
+        if (step + 1 == stepsNumber && false) {
             logger.info("collusion adaptation length,"
                     + "reliability adaptation length,fraction adaptation length");
             logger.info(String.format("%d,%d,%d", adaptationLengthC,
@@ -178,25 +182,25 @@ class Evaluator {
     /**
      * Retrieves estimation from the reputation system at a given step.
      */
-    private void getEstimatedValues() {
+    private void getMeandValues() {
         estimatedBugging = new HashMap<Worker, Map<Worker, Double>>();
         errorBugging = new HashMap<Worker, Map<Worker, Double>>();
         for (Worker worker1 : workers) {
-            Map<Worker, Estimator> row = reputationSystem.getCollusionLikelihood(worker1, workers);
+            Map<Worker, RV> row = reputationSystem.getCollusionLikelihood(worker1, workers);
             estimatedBugging.put(worker1, new HashMap<Worker, Double>());
             errorBugging.put(worker1, new HashMap<Worker, Double>());
             for (Worker worker2 : workers) {
-                estimatedBugging.get(worker1).put(worker2, row.get(worker2).getEstimate());
+                estimatedBugging.get(worker1).put(worker2, row.get(worker2).getMean());
                 errorBugging.get(worker1).put(worker2, row.get(worker2).getError());
             }
         }
         estimatedReliability = new HashMap<Worker, Double>();
         errorReliability = new HashMap<Worker, Double>();
         for (Worker worker : workers) {
-            estimatedReliability.put(worker, reputationSystem.getReliability(worker).getEstimate());
+            estimatedReliability.put(worker, reputationSystem.getReliability(worker).getMean());
             errorReliability.put(worker, reputationSystem.getReliability(worker).getError());
         }
-        estimatedFraction = reputationSystem.getColludersFraction().getEstimate();
+        estimatedFraction = reputationSystem.getColludersFraction().getMean();
         errorFraction = reputationSystem.getColludersFraction().getError();
     }
 

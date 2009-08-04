@@ -206,7 +206,7 @@ public class Evaluator {
      */
     private static double getColludersFractionError() {
         final double colludersFraction = computeColludersFraction();
-        return abs(gc.getColludersFraction().getEstimate() - colludersFraction);
+        return abs(gc.getColludersFraction().getMean() - colludersFraction);
     }
 
     /**
@@ -219,7 +219,7 @@ public class Evaluator {
     private static double getReliabilityError() {
         double error = 0.0d;
         for (Worker worker : workers)
-            error += abs(gc.getReliability(worker).getEstimate()
+            error += abs(gc.getReliability(worker).getMean()
                     - reliability.get(worker).get(Msg.getClock()));
         return error / workers.size();
     }
@@ -273,7 +273,7 @@ public class Evaluator {
                 Set<simdeg.reputation.Worker> pair = new HashSet<simdeg.reputation.Worker>();
                 pair.add(worker1);
                 pair.add(worker2);
-                error += abs(gc.getCollusionLikelihood(pair).getEstimate()
+                error += abs(gc.getCollusionLikelihood(pair).getMean()
                         - collusion.get(worker1).get(worker2));
             }
         return error / workers.size() / workers.size();

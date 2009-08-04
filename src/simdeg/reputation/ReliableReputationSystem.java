@@ -7,8 +7,9 @@ import java.util.Set;
 import java.util.NoSuchElementException;
 import java.util.logging.Logger;
 
-import simdeg.util.BTS;
+import simdeg.util.BetaEstimator;
 import simdeg.util.Collections;
+import simdeg.util.RV;
 import simdeg.util.Estimator;
 
 /**
@@ -36,7 +37,7 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 	public void addAllWorkers(Set<? extends Worker> workers) {
         this.workers.addAll(workers);
 		for (Worker worker : workers)
-			reliability.put(worker, new BTS());
+			reliability.put(worker, new BetaEstimator());
 	}
 
 	/**
@@ -98,7 +99,7 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 	/**
 	 * Returns the estimated reliability of the worker.
 	 */
-	public Estimator getReliability(Worker worker) {
+	public RV getReliability(Worker worker) {
 		if (!reliability.containsKey(worker))
 			throw new NoSuchElementException("Inexistant worker");
 		logger.finer("Reliability of worker " + worker + " is "
@@ -106,8 +107,11 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 		return reliability.get(worker);
 	}
 
-    public void print() {
-        System.out.print("Reliability:");
+    public String toString() {
+        return "reliability-based reputation system";
+    }
+
+    protected void print() {
         for (Worker worker : workers)
             System.out.print(" " + reliability.get(worker));
         System.out.println();

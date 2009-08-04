@@ -10,7 +10,7 @@ import java.util.logging.Logger;
 import simdeg.reputation.Job;
 import simdeg.reputation.Result;
 import simdeg.reputation.Worker;
-import simdeg.util.Estimator;
+import simdeg.util.RV;
 
 /**
  * Collusion aware implementation of the result selection process which select
@@ -48,11 +48,11 @@ public class CollusionAwareResultCertificator extends ResultCertificator {
 		/* Store the likelihoods to avoid recomputation */
 		Map<Set<Worker>, Double> colludingLikelihood = new HashMap<Set<Worker>, Double>();
 		for (Set<Worker> group : map.values()) {
-			Estimator estimator = reputationSystem
+			RV rv = reputationSystem
 					.getCollusionLikelihood(group);
-			if (estimator.getError() > MAX_ERROR)
+			if (rv.getError() > MAX_ERROR)
 				throw new ResultCertificationException();
-			colludingLikelihood.put(group, estimator.getEstimate());
+			colludingLikelihood.put(group, rv.getMean());
 		}
 		for (Map.Entry<R, Set<Worker>> entry : map.entrySet()) {
 			/* We don't consider singleton group */

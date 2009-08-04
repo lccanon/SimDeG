@@ -10,7 +10,7 @@ import java.lang.Double;
 
 import flanagan.analysis.Stat;
 
-public class EMA extends Estimator {
+public class EMA extends RV {
 
     /** Logger */
     private static final Logger logger
@@ -67,7 +67,7 @@ public class EMA extends Estimator {
 
     public EMA(double estimate) {
         this(SHORT_TERM_STD_DEV, LONG_TERM_STD_DEV);
-        set(estimate, 0.0d);
+        set(0.0d, 1.0d, estimate, 0.0d);
     }
 
     public EMA(double shortTermStdDev, double longTermStdDev) {
@@ -76,6 +76,7 @@ public class EMA extends Estimator {
 
     public EMA(double shortTermEstimate, double longTermEstimate,
             double shortTermStdDev, double longTermStdDev) {
+        super(0.0d, 1.0d);
         this.shortTermEstimate = shortTermEstimate;
         this.longTermEstimate = longTermEstimate;
         this.shortTermStdDev = shortTermStdDev;
@@ -115,8 +116,7 @@ public class EMA extends Estimator {
     public EMA clone(double value, double error) {
         EMA result = new EMA(shortTermEstimate, value,
                 shortTermStdDev, longTermStdDev);
-        result.set(result.getEstimate(), error);
-        return result;
+        return result.set(this.lower, this.upper, result.getMean(), error);
     }
 
     public void setSample(double value) {
@@ -126,7 +126,7 @@ public class EMA extends Estimator {
         longTermEstimate += value * longTermEstimate;
     }
 
-    public double getEstimate() {
+    public double getMean() {
         return longTermEstimate;
     }
 
@@ -136,7 +136,7 @@ public class EMA extends Estimator {
         //return getEstimatorsConsistency(shortTermEstimate, longTermEstimate);
     }
 
-    public double getError(double level) {
+    private double getError(double level) {
         return getError();
     }
 
@@ -144,28 +144,42 @@ public class EMA extends Estimator {
         return 0.0d;
     }
 
-    protected boolean set(double estimate, double error) {
+    //XXX dirty and higly approximate
+    protected EMA set(double lower, double upper,
+            double estimate, double variance) {
+        super.set(lower, upper, estimate, variance);
         longTermEstimate = estimate;
-        //XXX dirty and higly approximate
         shortTermEstimate = longTermEstimate;
+        double error = Math.sqrt(variance) * 6.0d;
         while (getError() < error) {
-            if (longTermEstimate < 0.5)
-                shortTermEstimate += 0.1;
+            if (longTermEstimate < 0.5d)
+                shortTermEstimate += 0.1d;
             else
-                shortTermEstimate -= 0.1;
+                shortTermEstimate -= 0.1d;
         }
-        return true;
+        return this;
     }
 
+    protected EMA approximate(double lower, double upper,
+            double estimate, double variance) {
+        return set(lower, upper, estimate, variance);
+    }
+
+    /*
     public double getConsistency(Estimator estimator) {
         return Math.min(Math.min(1.0d - getError(),
                     1.0d - estimator.getError()),
-                getEstimatorsConsistency(abs(getEstimate()
-                        - estimator.getEstimate()),
+                getEstimatorsConsistency(abs(getMean()
+                        - estimator.getMean()),
                     longTermWeight, longTermWeight));
     }
+    */
 
-    public EMA reset() {
+    public EMA clear() {
+        return this;
+    }
+
+    public EMA merge(Estimator estimator) {
         return this;
     }
 

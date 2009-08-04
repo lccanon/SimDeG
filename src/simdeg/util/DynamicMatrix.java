@@ -103,6 +103,10 @@ public class DynamicMatrix<E> {
         testValidSet(set1, set2);
         if (estimator == null)
             throw new NullPointerException("Specified estimator is null");
+        if (estimator.getLowerEndpoint() != 0.0d
+                || estimator.getUpperEndpoint() != 1.0d)
+            throw new IllegalArgumentException(
+                    "Estimator not in valid boundaries: " + estimator);
         matrix.get(set1).put(set2, estimator);
         matrix.get(set2).put(set1, estimator);
     }
@@ -120,10 +124,14 @@ public class DynamicMatrix<E> {
         return biggest;
     }
 
+    /* TODO getGeneralError()
+     * Based on the number of groups, or the size of the biggest group, or the
+     * mean of each error (can be done in O(1) if it is updated each time an
+     * estimator is changed).
+     */
     /**
      * Gives a quick error indications of the current estimations.
      */
-    //TODO getGeneralError()
     public double getBiggestError() {
         double result = 0.0d;
         for (Set<E> set : matrix.keySet())
@@ -154,8 +162,9 @@ public class DynamicMatrix<E> {
         clean(set2);
         /* Update reverse for all concerned elements */
         updateReverse(merge);
-        /* Update biggest */
-        biggest = null;
+        /* Postpone the update of biggest */
+        if (biggest != null && merge.size() > biggest.size())
+            biggest = null;
         return merge;
     }
 
@@ -178,14 +187,15 @@ public class DynamicMatrix<E> {
         insertSet(newSet);
         /* Copy the estimators between the initial set and the new sets */
         copyEstimator(set, initialSet);
-        copyEstimator(set, newSet);
+        //copyEstimator(set, newSet);
         /* Clean matrix by removing the first set */
         clean(set);
         /* Update reverse for all concerned elements */
         reverse.put(element, newSet);
         updateReverse(initialSet);
-        /* Update biggest */
-        biggest = null;
+        /* Postpone the update of biggest */
+        if (biggest == set)
+            biggest = null;
     }
 
     /**
@@ -212,7 +222,7 @@ public class DynamicMatrix<E> {
                 setEstimator(set, otherSet, estimatorBase.clone());
             /* Uncertainty for others */
             else
-                setEstimator(set, otherSet, estimatorBase.clone().reset());
+                setEstimator(set, otherSet, estimatorBase.clone().clear());
         }
         assert(checkMatrix()) : "Matrix malformed";
     }
@@ -234,19 +244,15 @@ public class DynamicMatrix<E> {
     private void copyEstimator(Set<E> set1, Set<E> set2,
             Set<E> newSet) {
         for (Set<E> set : matrix.keySet())
-            if (set != newSet && set != set1 && set != set2)
-                // XXX Mean of both estimator ?
-                if (getEstimator(set1, set).getVariance()
-                        < getEstimator(set2, set).getVariance())
-                    setEstimator(newSet, set, getEstimator(set1, set).clone());
-                else
-                    setEstimator(newSet, set, getEstimator(set2, set).clone());
-        // XXX Mean of both estimator ?
-        if (getEstimator(set1, set1).getVariance()
-                < getEstimator(set2, set2).getVariance())
-            setEstimator(newSet, newSet, getEstimator(set1, set1).clone());
-        else
-            setEstimator(newSet, newSet, getEstimator(set2, set2).clone());
+            if (set != newSet && set != set1 && set != set2) {
+                final Estimator merge = Estimator.merge(getEstimator(set1, set),
+                        getEstimator(set2, set));
+                setEstimator(newSet, set, merge);
+            }
+        final Estimator merge = Estimator.merge(getEstimator(set1, set1),
+                getEstimator(set2, set2)).merge(getEstimator(set1, set2));
+        //System.out.println(getEstimator(set1, set1) + " " + getEstimator(set2, set2) + " " + getEstimator(set1, set2) + " " + merge);
+        setEstimator(newSet, newSet, merge);
     }
 
     private void updateReverse(Set<E> elements) {
@@ -288,10 +294,14 @@ public class DynamicMatrix<E> {
 
     public void print() {
         for (Set<E> set1 : matrix.keySet()) {
-            System.out.print("(" + set1.size() + "):");
+            System.out.print("(" + set1.size() + "): ");
+            // TODO remore the 2 following lines
+            for (E e : set1)
+                System.out.print(e + " ");
             for (Set<E> set2 : matrix.keySet())
                 System.out.print(" " + getEstimator(set1, set2));
             System.out.println();
+
         }
     }
 

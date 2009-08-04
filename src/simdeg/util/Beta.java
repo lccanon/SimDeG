@@ -5,23 +5,23 @@ import static simdeg.util.InverseMath.inverseNormal;
 
 import java.util.logging.Logger;
 import java.util.logging.Level;
-import java.lang.IllegalArgumentException;
 import java.lang.reflect.Method;
-import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
 
 /**
- * Estimator for Bernoulli Trial only. It is based on Bayesian estimation.
+ * Beta distribution.
  */
-public class Beta extends Estimator {
+public class Beta extends RV {
 
     /** Logger */
     private static final Logger logger
         = Logger.getLogger(Beta.class.getName());
 
-    private static final int MAX_ITERATION = 5;
+    /** Default variance of precise estimator */
+    protected static final double DEFAULT_VARIANCE
+        = (DEFAULT_ERROR / 6.0d) * (DEFAULT_ERROR / 6.0d);
 
-    /** Binary LUT for minimizing calls to complex functions */
+    /** Trinary LUT for minimizing calls to complex functions */
     private static TriLUT<Double, Double, Double, Double> errorValues = null;
 
     /** Number of values stored in the LUT */
@@ -51,131 +51,83 @@ public class Beta extends Estimator {
     /** Principal paramater representing quantity of zero values */
     private double beta = 1.0d;
 
+    /** If beta and alpha are equals to 0, then it is a simple Bernoulli RV */
+    private double bernoulli = 0.5d;
+
     /**
      * Initializes without any information.
      */
     public Beta() {
-        reset();
+        super(0.0d, 1.0d);
     }
 
     /**
      * Initializes with precise information.
      */
     public Beta(double estimate) {
-        this(estimate, DEFAULT_ERROR);
-    }
-
-    public Beta(double estimate, double error) {
+        super(0.0d, 1.0d);
         /* Test for admissibility of parameters */
         if (estimate < 0.0d || estimate > 1.0d)
             throw new OutOfRangeException(estimate, 0.0d, 1.0d);
-        if (error < 0.0d || error > 1.0d)
-            throw new OutOfRangeException(error, 0.0d, 1.0d);
-        this.lower = 0.0d;
-        this.upper = 1.0d;
-
-        /* Optimization */
-        if (error == 1.0d) {
-            reset();
-            return;
-        }
-        if (error == DEFAULT_ERROR && estimate == 0.0d) {
-            alpha = 1;
-            beta = 199;
-            return;
-        } else if (error == DEFAULT_ERROR && estimate == 1.0d) {
-            alpha = 199;
-            beta = 1;
-            return;
-        }
-
-        
-        /* Approximate iteratively the number of obsevations */
-        //XXX More precise and faster method
-        alpha = beta = 1.0d;
-        double bestAlpha = 1.0d, bestBeta = 1.0d;
-        double bestDiff = 1.0d;
-        final double increment = 0.1d / error;
-        for (int nbUnsuccess = 0; nbUnsuccess < MAX_ITERATION; ) {
-            /* Test if it is better */
-            if (Math.abs(getError() - error) < bestDiff) {
-                bestAlpha = alpha;
-                bestBeta = beta;
-                bestDiff = Math.abs(getError() - error);
-                nbUnsuccess = 0;
-            } else
-                nbUnsuccess++;
-            /* Try to get closer for next iteration */
-            final double weightedEstimate = (alpha + beta + increment) * estimate;
-            if (Math.abs(alpha - weightedEstimate) > Math.abs(alpha + increment - weightedEstimate))
-                alpha += increment;
-            else
-                beta += increment;
-        }
-
-        /* Take the best solutions */
-        alpha = bestAlpha;
-        beta = bestBeta;
+        set(0.0d, 1.0d, estimate, 0.0d);
     }
 
     /**
      * Internal initialization for faster cloning.
      */
-    protected Beta(double alpha, double beta, double lower, double upper) {
+    Beta(double lower, double upper, double alpha, double beta) {
+        super(lower, upper);
         /* Test for admissibility of parameters */
-        if (alpha < 1.0d)
-            throw new OutOfRangeException(alpha, 1.0d, Double.MAX_VALUE);
-        if (beta < 1.0d)
-            throw new OutOfRangeException(beta, 1.0d, Double.MAX_VALUE);
-        if (lower > upper)
-            throw new IllegalArgumentException("Range is not admissible: " + lower + ", " + upper);
+        if (alpha < 0.0d)
+            throw new OutOfRangeException(alpha, 0.0d, Double.MAX_VALUE);
+        if (beta < 0.0d)
+            throw new OutOfRangeException(beta, 0.0d, Double.MAX_VALUE);
         this.alpha = alpha;
         this.beta = beta;
-        this.lower = lower;
-        this.upper = upper;
+        if (alpha != 0.0d || beta != 0.0d)
+            this.bernoulli = alpha / (alpha + beta);
     }
 
-    /**
-     * Accessor for children of this class.
-     */
     protected double getAlpha() {
         return this.alpha;
     }
 
-    /**
-     * Accessor for children of this class.
-     */
     protected double getBeta() {
         return this.beta;
     }
 
-    public Beta clone() {
-        return new Beta(alpha, beta, lower, upper);
+    protected void setAlpha(double alpha) {
+        if (alpha < 0.0d)
+            throw new OutOfRangeException(alpha, 0.0d, Double.MAX_VALUE);
+        this.alpha = alpha;
     }
 
-    /**
-     * Notifies a new values (either 1 or 0).
-     */
-    public void setSample(double value) {
-        if (value != 0.0d && value != 1.0d)
-            throw new IllegalArgumentException
-                ("Estimator designed for Bernoulli trial only");
-        if (value == 1.0d)
-            alpha++;
-        else
-            beta++;
+    protected void setBeta(double beta) {
+        if (beta < 0.0d)
+            throw new OutOfRangeException(beta, 0.0d, Double.MAX_VALUE);
+        this.beta = beta;
+    }
+
+    public Beta clone() {
+        if (alpha == 0.0d && beta == 0.0d)
+            return new Beta(bernoulli);
+        return new Beta(lower, upper, alpha, beta);
     }
 
     /**
      * Gives the current estimate.
      */
-    public double getEstimate() {
-        assert(this.alpha >= 1.0d && this.beta >= 1.0d) : "Alpha or beta are uncorrect";
+    public double getMean() {
+        if (alpha == 0.0d && beta == 0.0d)
+            return bernoulli * (upper - lower) + lower;
         return alpha / (alpha + beta) * (upper - lower) + lower;
     }
 
     protected double getVariance() {
-        assert(this.alpha >= 1.0d && this.beta >= 1.0d) : "Alpha or beta are uncorrect";
+        assert(this.alpha >= 0.0d && this.beta >= 0.0d) : "Alpha or beta are uncorrect";
+        if (alpha == 0.0d && beta == 0.0d)
+            return bernoulli * (1.0d - bernoulli)
+                * (this.upper - this.lower) * (this.upper - this.lower);
         return alpha * beta / ((alpha + beta) * (alpha + beta)
                 * (alpha + beta + 1.0d))
             * (this.upper - this.lower) * (this.upper - this.lower);
@@ -188,75 +140,84 @@ public class Beta extends Estimator {
     /**
      * Gives the current error with a predefined condidence level.
      */
-    public double getError(double level) {
+    private double getError(double level) {
         /* Optimization */
-        if (alpha > MAX_LUT_INDEX + 1.0d || beta > MAX_LUT_INDEX + 1.0d)
-            return getEstimate() - inverseNormal((1.0d - level) / 2.0d,
-                    getEstimate(), getVariance());
-        
-        return errorValues.getValue(alpha, beta, level);
+        if ((alpha == 0.0d || beta == 0.0d) && alpha != beta)
+            return 0.0d;
+
+        /* Gaussian method (approximation for high value of alpha and beta) */
+        if (alpha > MAX_LUT_INDEX + 1.0d || beta > MAX_LUT_INDEX + 1.0d
+                || alpha < 1.0d || beta < 1.0d)
+            return getMean() - inverseNormal((1.0d - level) / 2.0d,
+                    getMean(), getVariance());
+
+        /* More accurate method (longer) */
+        return errorValues.getValue(alpha, beta, level)
+            * (this.upper - this.lower);
     }
 
     public static final double error(double alpha, double beta, double level) {
+        if (alpha == beta && alpha < 0.5d)
+            return 1.0d;
         final double estimate = alpha / (alpha + beta);
         final double aLinear = (1.0d - level) * estimate;
         final double bLinear = level + aLinear;
         final double aCentral = (1.0d - level) / 2.0d;
         final double bCentral = level + aCentral;
-        final double linear = Math.max(inverseIncompleteBeta(bLinear, alpha, beta) - estimate,
-                estimate - inverseIncompleteBeta(aLinear, alpha, beta));
-        final double central = Math.max(inverseIncompleteBeta(bCentral, alpha, beta) - estimate,
-                estimate - inverseIncompleteBeta(aCentral, alpha, beta));
+        final double linear = Math.max(inverseIncompleteBeta(bLinear, alpha, beta)
+                - estimate, estimate - inverseIncompleteBeta(aLinear, alpha, beta));
+        final double central = Math.max(inverseIncompleteBeta(bCentral, alpha, beta)
+                - estimate, estimate - inverseIncompleteBeta(aCentral, alpha, beta));
         return Math.min(linear, central);
     }
 
-    protected boolean set(double estimate, double variance) {
+    /**
+     * Adjust the mean and stick to the variance if both values are
+     * incompatible.
+     */
+    protected Beta set(double lower, double upper,
+            double estimate, double variance) {
+        super.set(lower, upper, estimate, variance);
+
         /* Optimization */
-        if (estimate == getEstimate() && variance == getVariance())
-            return true;
+        if (estimate == getMean() && variance == getVariance())
+            return this;
 
-        /* Normalize estimate and variance */
-        final double normalizedEstimate = (estimate - this.lower)
-            / (this.upper - this.lower);
-        final double normalizedVariance = variance
-            / ((this.upper - this.lower) * (this.upper - this.lower));
+        /* Normalize variance in the feasible range */
+        final double normalizedVariance = Math.min(0.25d,
+                Math.max(DEFAULT_VARIANCE, variance
+                    / ((this.upper - this.lower) * (this.upper - this.lower))));
 
-        /* Test for admissibility of parameter */
-        if (normalizedVariance <= 0.0d || normalizedVariance > 1.0d / 12.0d)
-            return false;
+        /* Feasible bound for the mean */
+        final double root = sqrt(1.0d - 4.0d * normalizedVariance);
+        final double minLower = (1.0d - root) / 2.0d;
+        final double maxUpper = (1.0d + root) / 2.0d;
 
-        /* Special cases where the estimate is out of bounds or the variance is too high */
-        final double product = normalizedEstimate * (1.0d - normalizedEstimate);
-        if (normalizedEstimate <= 0.0d || normalizedEstimate >= 1.0d
-                || normalizedVariance > product * normalizedEstimate / (1.0d + normalizedEstimate)
-                || normalizedVariance > product * (1.0d - normalizedEstimate) / (2.0d - normalizedEstimate)) {
-            logger.fine("Normalized mean is out of bounds");
-            final double polynom = 1.0d - normalizedVariance * normalizedVariance - 11.0d * normalizedVariance;
-            final double atanArg = 3.0d / (normalizedVariance + 18.0d) * Math.sqrt(3.0d * polynom / normalizedVariance);
-            final double sinArg = Math.atan(atanArg) / 3.0d + Math.PI / 6.0d;
-            final double shape = 2.0d / 3.0d * Math.sqrt((normalizedVariance + 3.0d) / normalizedVariance) * Math.sin(sinArg) - 4.0d / 3.0d;
-            this.alpha = normalizedEstimate < 0.5d ? 1.0d : shape;
-            this.beta = normalizedEstimate > 0.5d ? 1.0d : shape;
-        } else {
-            /* Normal computations */
-            final double intermediate = normalizedEstimate
-                * (1.0d - normalizedEstimate) / normalizedVariance - 1.0d;
-            this.alpha = normalizedEstimate * intermediate;
-            this.beta = (1.0d - normalizedEstimate) * intermediate;
-        }
+        /* Normalize estimate in the feasible range */
+        double normalizedEstimate = (estimate - lower) / (upper - lower);
+        normalizedEstimate = Math.max(minLower, normalizedEstimate);
+        normalizedEstimate = Math.min(maxUpper, normalizedEstimate);
 
-        assert(this.alpha >= 1.0d && this.beta >= 1.0d)
+        /* Parameters computation */
+        final double intermediate = normalizedEstimate
+            * (1.0d - normalizedEstimate) / normalizedVariance - 1.0d;
+        this.alpha = Math.max(0.0d, normalizedEstimate * intermediate);
+        this.beta = Math.max(0.0d, (1.0d - normalizedEstimate) * intermediate);
+        this.bernoulli = normalizedEstimate;
+
+        assert(this.alpha >= 0.0d && this.beta >= 0.0d)
             : "Alpha or beta are uncorrect: " + alpha + ", " + beta;
-        return true;
-    }
-
-    public Beta reset() {
-        this.alpha = 1.0d;
-        this.beta = 1.0d;
-        this.lower = 0.0d;
-        this.upper = 1.0d;
         return this;
     }
 
+    public String toString() {
+        java.text.DecimalFormat df = new java.text.DecimalFormat("0.##",
+                new java.text.DecimalFormatSymbols(java.util.Locale.ENGLISH));
+        return "{" + df.format(getMean()) + ","
+            + df.format(getError()) + "}/(" + df.format(alpha) + ","
+            + df.format(beta) + ","
+            + df.format(getLowerEndpoint()) + ","
+            + df.format(getUpperEndpoint()) + ")";
+    }
 
 }

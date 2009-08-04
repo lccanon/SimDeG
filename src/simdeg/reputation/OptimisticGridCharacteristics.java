@@ -5,8 +5,8 @@ import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
 
-import simdeg.util.BTS;
-import simdeg.util.Estimator;
+import simdeg.util.Beta;
+import simdeg.util.RV;
 
 /**
  * Optimistic strategy considering no collusion and no failure
@@ -47,27 +47,27 @@ public class OptimisticGridCharacteristics implements ReputationSystem {
     /**
      * Returns a perfect reliability for each worker.
      */
-    public Estimator getReliability(Worker worker) {
-        return new BTS(1.0d);
+    public RV getReliability(Worker worker) {
+        return new Beta(1.0d);
     }
 
     /**
      * Returns a zero likelihood that any given group of workers give the
      * same wrong result.
      */
-    public Estimator getCollusionLikelihood(Set<? extends Worker> workers) {
-        return new BTS(0.0d);
+    public RV getCollusionLikelihood(Set<? extends Worker> workers) {
+        return new Beta(0.0d);
     }
 
     /**
      * Returns the estimated likelihoods that a worker will return the same
      * wrong result than each other.
      */
-    public <W extends Worker> Map<W,Estimator> getCollusionLikelihood(W worker,
+    public <W extends Worker> Map<W,RV> getCollusionLikelihood(W worker,
             Set<W> workers) {
-        Map<W,Estimator> result = new HashMap<W,Estimator>();
+        Map<W,RV> result = new HashMap<W,RV>();
         for (W otherWorker : workers)
-            result.put(otherWorker, new BTS(0.0d));
+            result.put(otherWorker, new Beta(0.0d));
         return result;
     }
 
@@ -75,8 +75,8 @@ public class OptimisticGridCharacteristics implements ReputationSystem {
      * Returns an optimistic fraction of colluders (workers returning together
      * the same wrong result).
      */
-    public Estimator getColludersFraction() {
-        return new BTS(0.0d);
+    public RV getColludersFraction() {
+        return new Beta(0.0d);
     }
 
 }

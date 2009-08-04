@@ -1,6 +1,6 @@
 package simdeg.reputation;
 
-import simdeg.util.Estimator;
+import simdeg.util.RV;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -20,14 +20,13 @@ public class TestReliableReputationSystem {
     private static Worker worker;
     private static Set<Worker> workers;
 
+    private static final double LARGE_EPSILON = 1E-1d;
     private static final double MIN_ERROR = 0.25d;
-    private static final double EPSILON = 2E-2d;
 
     @BeforeClass public static void createWorkers() {
         workers = new HashSet<Worker>();
-        workers.add(new Worker() {});
-        workers.add(new Worker() {});
-        workers.add(new Worker() {});
+        for (int i=0; i<3; i++)
+            workers.add(new Worker() {});
         worker = workers.iterator().next();
     }
 
@@ -35,7 +34,7 @@ public class TestReliableReputationSystem {
         ReliableReputationSystem rrs
             = new ReliableReputationSystem();
         rrs.addAllWorkers(workers);
-        Estimator reliability = rrs.getReliability(worker);
+        RV reliability = rrs.getReliability(worker);
         assertTrue("Error too low: " + reliability.getError(),
                 reliability.getError() > MIN_ERROR);
     }
@@ -67,8 +66,10 @@ public class TestReliableReputationSystem {
             rrs.setCertifiedResult(job, correct);
         }
         /* Test collusion estimations */
-        Estimator reliability = rrs.getReliability(worker);
-        assertEquals(0.5d, reliability.getEstimate(), reliability.getError());
+        RV reliability = rrs.getReliability(worker);
+        assertEquals(0.5d, reliability.getMean(), LARGE_EPSILON);
+        assertTrue("Error too high: " + reliability.getError(),
+                reliability.getError() < LARGE_EPSILON);
     }
 
 }

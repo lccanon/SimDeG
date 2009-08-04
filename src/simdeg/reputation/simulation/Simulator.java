@@ -71,6 +71,7 @@ class Simulator {
     private static double buggingPropagationRate = 0.0d;
 
     private static enum Parameter {
+        ReputationLevel, EstimationLevel,
         ReputationSystemComponent, ResourcesGroupSizeMean, ResourcesGroupSizeHeterogeneity, SchedulingSeed,
         StepsNumber, WorkersNumber, ResultArrivalHeterogeneity, ResultArrivalSeed,
         ReliabilityWorkersFraction1, ReliabilityProbability1,
@@ -91,6 +92,7 @@ class Simulator {
                 if (Integer.valueOf(value) < 0)
                     throw new OutOfRangeException(Integer.valueOf(value), 0, Integer.MAX_VALUE);
                 break;
+            case ReputationLevel: case EstimationLevel:
             case ResourcesGroupSizeMean: case ResourcesGroupSizeHeterogeneity:
             case ResultArrivalHeterogeneity: case ReliabilityWorkersFraction1:
             case ReliabilityProbability1: case ReliabilityWorkersFraction2:
@@ -104,6 +106,16 @@ class Simulator {
         }
         try {
             switch (Parameter.valueOf(name)) {
+                case ReputationLevel:
+                    simdeg.reputation.AgreementMatrix.AGREEMENT_THRESHOLD = Double.valueOf(value);
+                    if (Double.valueOf(value) >= 0.98)
+                        simdeg.reputation.CollusionMatrix.MAX_ERROR = 0.15;
+                    break;
+                case EstimationLevel:
+                    // TODO: it is an error to use this parameter to specified
+                    //       the level of BTS reinitializations
+                    simdeg.util.Estimator.DEFAULT_LEVEL = Double.valueOf(value);
+                    break;
                 case ReputationSystemComponent:
                     try {
                         String gridCharacteristicsStr = "simdeg.reputation." + value;
