@@ -173,7 +173,7 @@ public class BetaEstimator extends Estimator {
 
     public double sampleCountLimit(double error) {
         final double sd = error
-            / inverseStandardNormal(DEFAULT_LEVEL / 2.0d + 0.5d);
+            / inverseStandardNormal(DEFAULT_ERROR_LEVEL / 2.0d + 0.5d);
         final double alpha = (1.0d / (4.0d * sd * sd) - 1.0d) / 2.0d;
         return (alpha - 1.0d) * 2.0d;
     }

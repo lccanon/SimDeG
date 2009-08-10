@@ -161,4 +161,14 @@ public class CollusionMatrix extends DynamicMatrix<Worker> {
         return result;
     }
 
+    protected final int countNonColluder() {
+        int count = 0;
+        for (Set<Worker> set : getSets(getAll()))
+            if (getEstimator(set, set).getMean() < 1.0d / (2.0d
+                        + set.size()) && getEstimator(set, set).getMean() <
+                    getEstimator(set, set).getError())
+                count += set.size();
+        return count;
+    }
+
 }

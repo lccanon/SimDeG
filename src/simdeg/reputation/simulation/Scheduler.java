@@ -127,7 +127,6 @@ public class Scheduler {
                 RandomManager.getRandom("scheduling"));
     }
 
-    private int jobIndex = 0;
 	/**
 	 * Requests a job for a given worker.
 	 */
@@ -135,7 +134,7 @@ public class Scheduler {
             double resourcesGroupSizeHeterogeneity) {
 		if (jobsQueue.get(worker).isEmpty()) {
             /* Create a new job and find workers for it */
-			Job job = new Job("job" + jobIndex++);
+			Job job = new Job();
             Set<Worker> currentWorkers = getGroup(resourcesGroupSizeMean,
                     resourcesGroupSizeHeterogeneity);
 
@@ -162,7 +161,7 @@ public class Scheduler {
 	/**
 	 * Tries to get the best result for the given job.
 	 */
-	private Result getCertifiedResult(Job job, Evaluator evaluator) {
+	private Result getCertifiedResult(Job job) {
 		List<Result> resultsList = resultingResults.get(job);
         Map<Result, Integer> map = new HashMap<Result, Integer>();
         for (Result result : resultsList)
@@ -216,7 +215,7 @@ public class Scheduler {
             resultingResults.get(job).add(result);
             if (resultingResults.get(job).size() == workersJob.get(job).size())
                 reputationSystem.setCertifiedResult(job,
-                        getCertifiedResult(job, evaluator));
+                        getCertifiedResult(job));
 
             /* Assignment */
             worker.submitJob(getJob(worker, resourcesGroupSizeMean,

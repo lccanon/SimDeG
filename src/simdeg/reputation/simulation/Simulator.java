@@ -70,9 +70,16 @@ class Simulator {
     private static double buggingSwitchSpeed = 0.0d;
     private static double buggingPropagationRate = 0.0d;
 
+    /* TODO add parameters
+     * Parameters of the reputation system, the method for the certification
+     * and the files containing the traces and the desired characterization.
+     */
     private static enum Parameter {
-        ReputationLevel, EstimationLevel,
-        ReputationSystemComponent, ResourcesGroupSizeMean, ResourcesGroupSizeHeterogeneity, SchedulingSeed,
+        ReputationSystemComponent, EstimationLevel,
+        /* TODO separate the simulation and the traces
+         * The following parameters can be used in order to generate traces.
+         */
+        ResourcesGroupSizeMean, ResourcesGroupSizeHeterogeneity, SchedulingSeed,
         StepsNumber, WorkersNumber, ResultArrivalHeterogeneity, ResultArrivalSeed,
         ReliabilityWorkersFraction1, ReliabilityProbability1,
         ReliabilityWorkersFraction2, ReliabilityProbability2,
@@ -92,7 +99,7 @@ class Simulator {
                 if (Integer.valueOf(value) < 0)
                     throw new OutOfRangeException(Integer.valueOf(value), 0, Integer.MAX_VALUE);
                 break;
-            case ReputationLevel: case EstimationLevel:
+            case EstimationLevel:
             case ResourcesGroupSizeMean: case ResourcesGroupSizeHeterogeneity:
             case ResultArrivalHeterogeneity: case ReliabilityWorkersFraction1:
             case ReliabilityProbability1: case ReliabilityWorkersFraction2:
@@ -106,16 +113,6 @@ class Simulator {
         }
         try {
             switch (Parameter.valueOf(name)) {
-                case ReputationLevel:
-                    simdeg.reputation.AgreementMatrix.AGREEMENT_THRESHOLD = Double.valueOf(value);
-                    if (Double.valueOf(value) >= 0.98)
-                        simdeg.reputation.CollusionMatrix.MAX_ERROR = 0.15;
-                    break;
-                case EstimationLevel:
-                    // TODO: it is an error to use this parameter to specified
-                    //       the level of BTS reinitializations
-                    simdeg.util.Estimator.DEFAULT_LEVEL = Double.valueOf(value);
-                    break;
                 case ReputationSystemComponent:
                     try {
                         String gridCharacteristicsStr = "simdeg.reputation." + value;
@@ -126,6 +123,9 @@ class Simulator {
                                 + " is not implemented", e);
                         System.exit(1);
                     }
+                    break;
+                case EstimationLevel:
+                    simdeg.util.Estimator.DEFAULT_REINIT_LEVEL = Double.valueOf(value);
                     break;
                 case ResourcesGroupSizeMean:
                     resourcesGroupSizeMean = Double.valueOf(value);
@@ -386,10 +386,10 @@ class Simulator {
             final Switcher<Set<CollusionGroup>> bugging
                 = buggingSwitchers.iterator().next();
             buggingSwitchers.remove(bugging);
-            final Worker worker = new Worker("worker"+i, reliable, bugging);
+            final Worker worker = new Worker(reliable, bugging);
             workersReliability.put(worker, reliable);
             buggingGroups.put(worker, bugging);
-            logger.config("Worker " + worker.getName()
+            logger.config(("Worker " + i)
                     + " created with reliability switcher " + reliable
                     + ", bugging groups switcher " + bugging);
         }
@@ -416,8 +416,6 @@ class Simulator {
 
         /* Initialize the evaluation of the reputation system */
         Evaluator evaluator = new Evaluator(reputationSystem);
-        evaluator.setSteps(stepsNumber, reliabilitySwitchStep,
-                buggingSwitchStep);
 
         /* Set the platform characteristics */
         Set<Worker> workers = initializeWorkers(evaluator);

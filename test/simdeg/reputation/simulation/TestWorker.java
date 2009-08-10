@@ -33,7 +33,7 @@ public class TestWorker {
         group[0].add(new CollusionGroup(0.5d, ""));
         Switcher<Set<CollusionGroup>> col
             = new Switcher<Set<CollusionGroup>>(group, new double[0], new double[0]);
-        new Worker("worker", rel, col);
+        new Worker(rel, col);
     }
 
     @Test(expected=OutOfRangeException.class)
@@ -44,7 +44,7 @@ public class TestWorker {
         Switcher<Set<CollusionGroup>> col
             = new Switcher<Set<CollusionGroup>>(group, new double[0], new double[0]);
         group[0].add(new CollusionGroup(0.1d, ""));
-        new Worker("worker", rel, col);
+        new Worker(rel, col);
     }
 
     @Test public void getResult() {
@@ -53,10 +53,10 @@ public class TestWorker {
         group[0].add(new CollusionGroup(0.5d, ""));
         Switcher<Set<CollusionGroup>> col
             = new Switcher<Set<CollusionGroup>>(group, new double[0], new double[0]);
-        Worker worker = new Worker("worker", rel, col);
+        Worker worker = new Worker(rel, col);
         int numberCorrect = 0, numberFailed = 0, numberCollude = 0;
         for (int i=0; i<1000; i++) {
-            worker.submitJob(new Job(""));
+            worker.submitJob(new Job());
             final Result result = worker.getResult(0);
             switch (result.getType()) {
                 case CORRECT:

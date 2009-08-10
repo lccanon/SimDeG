@@ -5,31 +5,30 @@ import java.util.logging.Logger;
 /**
  * A Job is created and is submitted to workers whith duplication.
  */
-class Job implements simdeg.reputation.Job<Result> {
+class Job implements simdeg.reputation.Job {
 
     /** Logger */
     private static final Logger logger
         = Logger.getLogger(Job.class.getName());
 
-    private final String name;
-
     /**
      * Used during workload creation.
      */
-    protected Job(String name) {
-        this.name = name;
-        this.hash = name.hashCode();
+    protected Job() {
     }
 
-    protected String getName() {
-        return name;
+    /**
+     * Used during duplicationg.
+     */
+    private Job(int hash) {
+        this.hash = hash;
     }
 
     /**
      * Used when the algorithm duplicates a Job and associates it to a Worker.
      */
     protected Job duplicate() {
-        return new Job(getName());
+        return new Job(hashCode());
     }
 
     /**
@@ -47,7 +46,8 @@ class Job implements simdeg.reputation.Job<Result> {
         return false;
     }
 
-    public final int hash;
+    private static int count = 0;
+    private int hash = count++;
     /**
      * Used for HashSet.
      */
@@ -56,7 +56,7 @@ class Job implements simdeg.reputation.Job<Result> {
     }
 
     public String toString() {
-        return getName();
+        return "job" + hash;
     }
 
 }

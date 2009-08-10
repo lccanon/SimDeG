@@ -13,13 +13,13 @@ import static org.junit.Assert.*;
 
 import simdeg.reputation.ReputationSystem;
 import simdeg.util.Switcher;
-import simdeg.util.Estimator;
-import simdeg.util.BTS;
+import simdeg.util.RV;
+import simdeg.util.Beta;
 import simdeg.util.OutOfRangeException;
 
 public class TestScheduler {
 
-    /* To be ignore if the output has to be analysed */
+    /* To be ignored if the output has to be analysed */
     @BeforeClass
     public static void desactivateLogger() {
         Logger logger1
@@ -39,33 +39,33 @@ public class TestScheduler {
             }
             public void setCertifiedResult(simdeg.reputation.Job job, simdeg.reputation.Result result) {
             }
-            public Estimator getReliability(simdeg.reputation.Worker worker) {
-                if (((Worker)worker).getName().equals("worker1"))
-                    return new BTS(0.5d, 0.01d);
-                return new BTS(1.0d, 0.01d);
+            public RV getReliability(simdeg.reputation.Worker worker) {
+                if (((Worker)worker).toString().equals("worker1"))
+                    return new Beta(0.5d);
+                return new Beta(1.0d);
             }
-            public Estimator getCollusionLikelihood(Set<? extends simdeg.reputation.Worker> workers) {
+            public RV getCollusionLikelihood(Set<? extends simdeg.reputation.Worker> workers) {
                 for (simdeg.reputation.Worker worker : workers)
-                    if (((Worker)worker).getName().equals("worker1")
-                            || ((Worker)worker).getName().equals("worker2"))
-                        return new BTS(0.0d, 0.01d);
-                return new BTS(0.5d, 0.01d);
+                    if (((Worker)worker).toString().equals("worker0")
+                            || ((Worker)worker).toString().equals("worker1"))
+                        return new Beta(0.0d);
+                return new Beta(0.5d);
             }
-            public <W extends simdeg.reputation.Worker> Map<W, Estimator> getCollusionLikelihood(
+            public <W extends simdeg.reputation.Worker> Map<W, RV> getCollusionLikelihood(
                     W worker, Set<W> workers) {
-                Map<W, Estimator> map = new HashMap<W, Estimator>();
+                Map<W, RV> map = new HashMap<W, RV>();
                 for (W otherWorker : workers)
-                    if ((((Worker)worker).getName().equals("worker1")
-                                || ((Worker)worker).getName().equals("worker2"))
-                            && (((Worker)otherWorker).getName().equals("worker1")
-                                || ((Worker)otherWorker).getName().equals("worker2")))
-                        map.put(otherWorker, new BTS(0.5d, 0.01d));
+                    if ((((Worker)worker).toString().equals("worker0")
+                                || ((Worker)worker).toString().equals("worker1"))
+                            && (((Worker)otherWorker).toString().equals("worker0")
+                                || ((Worker)otherWorker).toString().equals("worker1")))
+                        map.put(otherWorker, new Beta(0.5d));
                     else
-                        map.put(otherWorker, new BTS(0.0d, 0.01d));
+                        map.put(otherWorker, new Beta(0.0d));
                 return map;
             }
-            public Estimator getColludersFraction() {
-                return new BTS(0.4d, 0.01d);
+            public RV getColludersFraction() {
+                return new Beta(0.4d);
             }
             public String toString() {
                 return "test reputation system";
@@ -89,29 +89,29 @@ public class TestScheduler {
         Switcher<Double> rel = new Switcher<Double>(proba, new double[0], new double[0]);
         Switcher<Set<CollusionGroup>> col
             = new Switcher<Set<CollusionGroup>>(group, new double[0], new double[0]);
-        Worker worker1 = new Worker("worker1", rel, col);
+        Worker worker1 = new Worker(rel, col);
         workersReliability.put(worker1, rel);
         buggingGroups.put(worker1, col);
         /* Worker2 */
         proba = new Double[1];
         proba[0] = 1.0d;
         rel = new Switcher<Double>(proba, new double[0], new double[0]);
-        Worker worker2 = new Worker("worker2", rel, col);
+        Worker worker2 = new Worker(rel, col);
         workersReliability.put(worker2, rel);
         buggingGroups.put(worker2, col);
         /* Worker3 */
         group = new Set[1];
         group[0] = new HashSet<CollusionGroup>();
         col = new Switcher<Set<CollusionGroup>>(group, new double[0], new double[0]);
-        Worker worker3 = new Worker("worker3", rel, col);
+        Worker worker3 = new Worker(rel, col);
         workersReliability.put(worker3, rel);
         buggingGroups.put(worker3, col);
         /* Worker4 */
-        Worker worker4 = new Worker("worker4", rel, col);
+        Worker worker4 = new Worker(rel, col);
         workersReliability.put(worker4, rel);
         buggingGroups.put(worker4, col);
         /* Worker5 */
-        Worker worker5 = new Worker("worker5", rel, col);
+        Worker worker5 = new Worker(rel, col);
         workersReliability.put(worker5, rel);
         buggingGroups.put(worker5, col);
     }
@@ -123,7 +123,6 @@ public class TestScheduler {
         Map<Worker,Switcher<Set<CollusionGroup>>> buggingGroups = new HashMap<Worker,Switcher<Set<CollusionGroup>>>();
         createWorker(workersReliability, buggingGroups);
         evaluator.setWorkersFaultiness(workersReliability, buggingGroups);
-        evaluator.setSteps(100, 100, 100);
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
         scheduler.addAllWorkers(workersReliability.keySet());
     }
@@ -135,7 +134,6 @@ public class TestScheduler {
         Map<Worker,Switcher<Set<CollusionGroup>>> buggingGroups = new HashMap<Worker,Switcher<Set<CollusionGroup>>>();
         createWorker(workersReliability, buggingGroups);
         evaluator.setWorkersFaultiness(workersReliability, buggingGroups);
-        evaluator.setSteps(100, 100, 100);
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
         scheduler.addAllWorkers(workersReliability.keySet());
         scheduler.removeAllWorkers(workersReliability.keySet());
@@ -148,7 +146,6 @@ public class TestScheduler {
         Map<Worker,Switcher<Set<CollusionGroup>>> buggingGroups = new HashMap<Worker,Switcher<Set<CollusionGroup>>>();
         createWorker(workersReliability, buggingGroups);
         evaluator.setWorkersFaultiness(workersReliability, buggingGroups);
-        evaluator.setSteps(100, 100, 100);
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
         scheduler.addAllWorkers(workersReliability.keySet());
         scheduler.start(100, 3.0d, 0.5d, 0.9d);
@@ -162,7 +159,6 @@ public class TestScheduler {
         Map<Worker,Switcher<Set<CollusionGroup>>> buggingGroups = new HashMap<Worker,Switcher<Set<CollusionGroup>>>();
         createWorker(workersReliability, buggingGroups);
         evaluator.setWorkersFaultiness(workersReliability, buggingGroups);
-        evaluator.setSteps(100, 100, 100);
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
         scheduler.addAllWorkers(workersReliability.keySet());
         scheduler.start(100, 3.0d, 1.01d, 0.9d);

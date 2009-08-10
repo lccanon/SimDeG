@@ -17,7 +17,7 @@ public class RandomResultCertificator extends ResultCertificator {
 	/**
 	 * Returns the a random result.
 	 */
-	<J extends Job<R>, R extends Result> R selectBestResult(
+	<J extends Job, R extends Result> R selectBestResult(
 			List<Worker> workers, List<R> results) {
 		assert (!results.isEmpty()) : "No job given to the result certificator";
 		final List<R> result = Collections.getRandomSubGroup(1, results,
@@ -28,7 +28,7 @@ public class RandomResultCertificator extends ResultCertificator {
 	/**
 	 * Returns an result in every cases which is the less worse.
 	 */
-	<J extends Job<R>, R extends Result> R selectLessWorseResult(
+	<J extends Job, R extends Result> R selectLessWorseResult(
 			List<Worker> workers, List<R> results) {
 		return selectBestResult(workers, results);
 	}

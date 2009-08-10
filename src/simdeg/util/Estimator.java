@@ -6,6 +6,13 @@ package simdeg.util;
  */
 public abstract class Estimator extends RV {
 
+    /**
+     * Default confidence level concerning the frequency and sensitivity of
+     * the reinitialization.
+     */
+    //protected static final double DEFAULT_REINIT_LEVEL = 0.95d;
+    public static double DEFAULT_REINIT_LEVEL = 0.95d;
+
     protected Estimator(double lower, double upper) {
         super(lower, upper);
     }

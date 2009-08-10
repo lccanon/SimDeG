@@ -13,8 +13,8 @@ public class BTS extends BetaEstimator {
     /** Logger */
     private static final Logger logger
         = Logger.getLogger(BTS.class.getName());
-
-    private double level = DEFAULT_LEVEL;
+ 
+    private double level = DEFAULT_REINIT_LEVEL;
 
     private int successiveZero = 0;
 
@@ -25,7 +25,7 @@ public class BTS extends BetaEstimator {
     }
 
     public BTS(double estimate) {
-        this(estimate, DEFAULT_LEVEL);
+        this(estimate, DEFAULT_REINIT_LEVEL);
     }
 
     public BTS(double estimate, double level) {

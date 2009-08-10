@@ -132,7 +132,7 @@ public class DynamicMatrix<E> {
     /**
      * Gives a quick error indications of the current estimations.
      */
-    public double getBiggestError() {
+    public double getGeneralError() {
         double result = 0.0d;
         for (Set<E> set : matrix.keySet())
             result += getEstimator(getBiggest(), set).getError();

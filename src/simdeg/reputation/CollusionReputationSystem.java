@@ -88,7 +88,7 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 
 	/**
 	 * Specifies the winning group among all these groups of workers giving
-	 * distinct answers. Workers does not contain the winning set.
+	 * distinct results. Workers does not contain the winning set.
 	 */
 	protected void setDistinctSets(Job job, Set<Worker> winningWorkers,
 			Set<Set<Worker>> workers) {
@@ -175,11 +175,11 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	 * the same wrong result).
 	 */
 	public RV getColludersFraction() {
-		final Set<Worker> biggest = collusion.getBiggest();
-		final double fraction = 1.0d - (double) biggest.size() / workers.size();
+        final int countNonColluder = collusion.countNonColluder();
+		final double fraction = 1.0d - (double)countNonColluder / workers.size();
 		final RV result = new RV(0.0d, 1.0d) {
-            double error = collusion.getBiggestError();
-            public RV clone() { return null; }
+            double error = collusion.getGeneralError();
+            public RV clone() { return this; }
             public double getMean() { return fraction; }
             protected double getVariance() { return 0.0d; }
             public double getError() { return error; }

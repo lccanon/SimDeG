@@ -20,6 +20,10 @@ import simdeg.util.OutOfRangeException;
  */
 class Worker implements simdeg.reputation.Worker {
 
+    /** Logger */
+    private static final Logger logger
+        = Logger.getLogger(Worker.class.getName());
+
     /** Failure-related variable */
     private Switcher<Double> reliability = null;
 
@@ -33,9 +37,8 @@ class Worker implements simdeg.reputation.Worker {
     /** Current status of the Worker */
     private Job currentJob = null;
 
-    protected Worker(String name, Switcher<Double> reliability,
+    protected Worker(Switcher<Double> reliability,
             Switcher<Set<CollusionGroup>> buggingGroups) {
-        this.name = name;
         setReliability(reliability);
         setBuggingGroups(buggingGroups);
         checkProbabilities();
@@ -62,7 +65,7 @@ class Worker implements simdeg.reputation.Worker {
     }
 
     public String toString() {
-        return getName();
+        return "worker" + hash;
     }
 
     /**
@@ -109,7 +112,7 @@ group:  for (CollusionGroup buggingGroup : buggingGroups.get(step)) {
     /**
      * Decides the result result based on the specified probability.
      */
-    private Result computeAnswer(Job job, int step) {
+    private Result computeResult(Job job, int step) {
 
         /* Buggy case */
         Set<CollusionGroup> groupsBugging = whichBugging(job, step);
@@ -135,18 +138,12 @@ group:  for (CollusionGroup buggingGroup : buggingGroups.get(step)) {
     }
 
     protected Result getResult(int step) {
-        final Result result = computeAnswer(currentJob, step);
+        final Result result = computeResult(currentJob, step);
         previousResults.put(currentJob, result);
         logger.fine("Worker " + this + " has computed job " + currentJob
                 + " and found result " + result + " at step " + step);
         currentJob = null;
         return result;
-    }
-
-    private final String name;
-
-    protected String getName() {
-        return name;
     }
 
     private static int count = 0;
@@ -157,9 +154,5 @@ group:  for (CollusionGroup buggingGroup : buggingGroups.get(step)) {
     public final int hashCode() {
         return hash;
     }
-
-    /** Logger */
-    private static final Logger logger
-        = Logger.getLogger(Worker.class.getName());
 
 }

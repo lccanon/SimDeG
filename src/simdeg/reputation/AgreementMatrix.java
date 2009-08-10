@@ -69,4 +69,15 @@ public class AgreementMatrix extends DynamicMatrix<Worker> {
         return result;
     }
 
+    protected final int countAgreerMajority() {
+        final Set<Worker> biggest = getBiggest();
+        int count = 0;
+        for (Set<Worker> set : getSets(getAll()))
+            if (getEstimator(set, biggest).getMean() > 1.0d - 1.0d / (2.0d
+                        + set.size()) && getEstimator(set, biggest).getMean() >
+                    1.0d - getEstimator(set, biggest).getError())
+                count += set.size();
+        return count;
+    }
+
 }

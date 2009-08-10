@@ -23,7 +23,7 @@ public class SparingResourcesGrouper extends ResourcesGrouper {
 
     /**
      * Gets an extension of the group of workers given in argument (in case
-     * of answers selection failure). Return null if all the known workers
+     * of results selection failure). Return null if all the known workers
      * are already in the initial group.
      */
     Set<Worker> getGroupExtension(Set<Worker> workers) {

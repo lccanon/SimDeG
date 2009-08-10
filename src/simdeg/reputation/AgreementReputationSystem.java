@@ -60,7 +60,7 @@ public class AgreementReputationSystem extends SkeletonReputationSystem {
                         setWorker, setOtherWorker)) {
                 agreement.increaseAgreement(worker, otherWorker);
                 adaptInteractionStructure(job, setWorker, setOtherWorker,
-                    agreement.getSet(worker), agreement.getSet(otherWorker));
+                        agreement.getSet(worker), agreement.getSet(otherWorker));
             }
         }
 	}
@@ -79,14 +79,14 @@ public class AgreementReputationSystem extends SkeletonReputationSystem {
                         setWorker, setOtherWorker)) {
                 agreement.decreaseAgreement(worker, otherWorker);
                 adaptInteractionStructure(job, setWorker, setOtherWorker,
-                    agreement.getSet(worker), agreement.getSet(otherWorker));
+                        agreement.getSet(worker), agreement.getSet(otherWorker));
             }
         }
     }
 
 	/**
 	 * Specifies the winning group among all these groups of workers giving
-	 * distinct answers. Workers does not contain the winning set.
+	 * distinct results. Workers does not contain the winning set.
 	 */
 	protected void setDistinctSets(Job job, Set<Worker> winningWorkers,
 			Set<Set<Worker>> workers) {
@@ -107,7 +107,7 @@ public class AgreementReputationSystem extends SkeletonReputationSystem {
             for (int j = i; j < proba[i].length; j++)
                 rv = min(rv, add(proba[i][j], 1.0d).subtract(proba[0][i - 1])
                         .subtract(proba[0][j]).multiply(0.5d)
-                        .truncateRange(0.0d, 1.0d));
+                        .truncateRange(0.0d, 1.0d)).min(proba[i][j]);
 
 		assert (rv.getMean() >= 0.0d) : "Negative estimate: "
 				+ rv.getMean();
@@ -140,11 +140,11 @@ public class AgreementReputationSystem extends SkeletonReputationSystem {
 	 * the same wrong result).
 	 */
 	public RV getColludersFraction() {
-		final Set<Worker> biggest = agreement.getBiggest();
-		final double fraction = 1.0d - (double) biggest.size() / workers.size();
+        final int countAgreer = agreement.countAgreerMajority();
+		final double fraction = 1.0d - (double)countAgreer / workers.size();
         final RV result = new RV(0.0d, 1.0d) {
-            double error = agreement.getBiggestError();
-            public RV clone() { return null; }
+            double error = agreement.getGeneralError();
+            public RV clone() { return this; }
             public double getMean() { return fraction; }
             protected double getVariance() { return 0.0d; }
             public double getError() { return error; }

@@ -37,7 +37,7 @@ public class Beta extends RV {
             errorValues = new TriLUT<Double, Double, Double, Double>(errorMethod,
                     new Double[] {1.0d, MAX_LUT_INDEX + 1.0d, 1.0d},
                     new Double[] {1.0d, MAX_LUT_INDEX + 1.0d, 1.0d},
-                    new Double[] {DEFAULT_LEVEL, DEFAULT_LEVEL, 1.0d});
+                    new Double[] {DEFAULT_ERROR_LEVEL, DEFAULT_ERROR_LEVEL, 1.0d});
         } catch (NoSuchMethodException e) {
             logger.log(Level.SEVERE,
                     "The method error was not found", e);
@@ -134,7 +134,7 @@ public class Beta extends RV {
     }
 
     public double getError() {
-        return getError(DEFAULT_LEVEL);
+        return getError(DEFAULT_ERROR_LEVEL);
     }
 
     /**

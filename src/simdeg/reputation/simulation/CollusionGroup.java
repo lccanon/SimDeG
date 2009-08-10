@@ -54,7 +54,7 @@ class CollusionGroup {
     }
 
     public String toString() {
-        return "{" + probability + " " + workers.toString() + "}";
+        return "{" + probability + " " + workers + "}";
     }
 
 }

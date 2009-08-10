@@ -19,7 +19,7 @@ import simdeg.reputation.Worker;
  * Main component of the scheduling package. It provides a generic interface for
  * assembling scheduling component to form a policy.
  */
-public class Scheduler<J extends Job<R>, R extends Result> {
+public class Scheduler<J extends Job, R extends Result> {
 
 	/** Logger */
 	private static final Logger logger = Logger.getLogger(Scheduler.class

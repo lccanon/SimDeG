@@ -248,7 +248,7 @@ group:  for (CollusionGroup buggingGroup : buggingGroups.get(Msg.getClock())) {
     /**
      * Decides the result result based on the specified probability.
      */
-    private Result computeAnswer(Job job) {
+    private Result computeResult(Job job) {
         logger.finest("Failure (probability, measured, effective): "
                 + (1.0d - reliability.get(Msg.getClock())) + ", "
                 + shortTermFail + ", " + shortTermFailProba
@@ -319,7 +319,7 @@ group:  for (CollusionGroup buggingGroup : buggingGroups.get(Msg.getClock())) {
 
             synchronized(job.getServer()) {
                 /* Set the asnwer to the appropriate flag */
-                job.setResult(computeAnswer(job));
+                job.setResult(computeResult(job));
 
                 /* Store the job in previous job for collusion purpose */
                 previousJobs.add(job);

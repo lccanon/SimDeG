@@ -87,7 +87,7 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
 			throw new NoSuchElementException(
 					"Job never met before by the reputation system");
 
-		/* Inform in the grid characteristics which groups give separate answers */
+		/* Inform in the grid characteristics which groups give separate results */
 		Set<Set<Worker>> sets = new HashSet<Set<Worker>>();
 		Set<Worker> winningSet = new HashSet<Worker>();
 		for (Result otherResult : workersByResult.keySet()) {
@@ -179,7 +179,7 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
 
 	/**
 	 * Specifies the winning group among all these groups of workers giving
-	 * distinct answers. Workers does not contain the winning set.
+	 * distinct results. Workers does not contain the winning set.
 	 */
 	protected abstract void setDistinctSets(Job job,
 			Set<Worker> winningWorkers, Set<Set<Worker>> workers);

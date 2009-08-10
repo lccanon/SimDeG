@@ -16,7 +16,7 @@ import simgrid.msg.Task;
 
 /**
  * The Server is responsible of the workload creation, the submission of the
- * Jobs to the Workers and the reception of their answers.
+ * Jobs to the Workers and the reception of their results.
  */
 class Server extends simgrid.msg.Process {
 
@@ -125,7 +125,7 @@ class Server extends simgrid.msg.Process {
 
     public void main(String[] args) throws JniException, NativeException {
 
-        logger.info("Server is ready to receive answers");
+        logger.info("Server is ready to receive results");
 
         do {
             /* Ask new jobs to the scheduler for currently waiting workers */
@@ -138,7 +138,7 @@ class Server extends simgrid.msg.Process {
             /* Add the current worker to the waiting queue */
             waitingWorkers.add(job.getWorker());
 
-            /* Retrieve any decided answers */
+            /* Retrieve any decided results */
             submitCertifiedResults();
 
         } while (!isWorkloadCompleted());
@@ -155,7 +155,7 @@ class Server extends simgrid.msg.Process {
 
     /**
      * Inner class allowing to generate workload by waiting new job during the
-     * correct amount of time while the server is waiting for answers from
+     * correct amount of time while the server is waiting for results from
      * clients
      */
     private class WorkloadGenerator extends simgrid.msg.Process {

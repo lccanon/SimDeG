@@ -142,9 +142,9 @@ class Simulator {
                     String groupCreatorStr = "simdeg.scheduling." + components.get(0);
                     resourcesGrouper = (ResourcesGrouper)Class.forName
                         (groupCreatorStr).newInstance();
-                    String answerSelectorStr = "simdeg.scheduling." + components.get(1);
+                    String resultSelectorStr = "simdeg.scheduling." + components.get(1);
                     resultCertificator = (ResultCertificator)Class.forName
-                        (answerSelectorStr).newInstance();
+                        (resultSelectorStr).newInstance();
                     String gridCharacteristicsStr = "simdeg.reputation." + components.get(2);
                     reputationSystem = (ReputationSystem)Class.forName
                         (gridCharacteristicsStr).newInstance();

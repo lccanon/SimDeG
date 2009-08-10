@@ -3,7 +3,9 @@
   <property name="src-dir" value="src"/>
   <property name="test-dir" value="test"/>
   <property name="jar-file" value="jar/simdeg.jar"/>
-  <property name="main-class" value="simdeg.reputation.simulation.Simulator"/>
+  <property name="main-class" value="simdeg.simulation.Simulator"/>
+  <property name="jar-file-rep" value="jar/simdeg-rep.jar"/>
+  <property name="main-class-rep" value="simdeg.reputation.simulation.Simulator"/>
   <property name="report-dir" value="report"/>
   <property name="doc-dir" value="doc"/>
   <tstamp>
@@ -20,6 +22,8 @@
     <mkdir dir="${build-dir}"/>
     <javac destdir="${build-dir}" debug="yes" classpath="jar/junit-4.5.jar:jar/simgrid.jar:jar/flanagan.jar">
       <src path="${test-dir}"/>
+      <exclude name="**/scheduling/Test*.java"/>
+      <exclude name="**/simdeg/simulation/Test*.java"/>
       <compilerarg value="-Xlint"/>
     </javac>
   </target>
@@ -31,6 +35,19 @@
         <attribute name="Built-Date" value="${today}"/>
         <attribute name="Main-Class" value="${main-class}"/>
         <attribute name="Class-Path" value=". simgrid.jar flanagan.jar"/>
+      </manifest>
+      <fileset dir="${src-dir}">
+        <include name="**/*.java"/>
+        <exclude name="**/Test*.java"/>
+      </fileset>
+    </jar>
+    <jar destfile="${jar-file-rep}" basedir="${build-dir}"
+         includes="**/*.class" excludes="**/Test*.class">
+      <manifest>
+        <attribute name="Built-By" value="${user.name}"/>
+        <attribute name="Built-Date" value="${today}"/>
+        <attribute name="Main-Class" value="${main-class-rep}"/>
+        <attribute name="Class-Path" value=". flanagan.jar"/>
       </manifest>
       <fileset dir="${src-dir}">
         <include name="**/*.java"/>
@@ -60,8 +77,11 @@
       <batchtest fork="yes" todir="${report-dir}">
         <formatter type="xml"/>
         <fileset dir="${build-dir}">
+          <include name="**/reputation/simulation/TestEv*.class"/>
+<!--
           <include name="**/reputation/Test*.class"/>
           <include name="**/util/Test*.class"/>
+-->
           <exclude name="**/Test*$*.class"/>
         </fileset>
       </batchtest>

@@ -17,7 +17,7 @@ import simgrid.msg.NativeException;
  * duplicates it correctly and associate to each a worker. Then, the initial job
  * is submitted to the Simulator with the seleted result.
  */
-class Job extends Task implements simdeg.reputation.Job<Result> {
+class Job extends Task implements simdeg.reputation.Job {
 
     /** Logger */
     private static final Logger logger

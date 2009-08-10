@@ -7,9 +7,9 @@ public interface Result {
 
     /**
      * Class implementing this interface should override this method in order
-     * to test corretly the equality between 2 answers.
+     * to test corretly the equality between 2 results.
      */
-    public boolean equals(Object aAnswer);
+    public boolean equals(Object aResult);
 
     /**
      * Used for HashSet.

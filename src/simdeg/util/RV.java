@@ -12,7 +12,7 @@ public abstract class RV {
      * Default confidence level concerning the computation of the committed
      * error through getError(). This level is an upper bound.
      */
-    protected static final double DEFAULT_LEVEL = 0.95d;
+    protected static final double DEFAULT_ERROR_LEVEL = 0.95d;
 
     /**
      * Maximal error committed by default when an estimator is initialized to a

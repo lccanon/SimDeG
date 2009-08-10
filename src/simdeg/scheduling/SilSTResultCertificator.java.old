@@ -6,33 +6,33 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 /**
- * Implementation of the answer selection process which is described by
+ * Implementation of the result selection process which is described by
  * Domingues et al.
  */
-public class SilSTAnswerSelector extends AnswerSelector {
+public class SilSTResultSelector extends ResultSelector {
 
     /** Logger */
     private static final Logger logger
-        = Logger.getLogger(SilSTAnswerSelector.class.getName());
+        = Logger.getLogger(SilSTResultSelector.class.getName());
 
     private static final double MIN_CERTAINTY = 0.5d;
 
     private static final double COLLUSION_THRESHOLD = 0.01d;
 
     /**
-     * Returns the best answer according to the minimal likelihood of
+     * Returns the best result according to the minimal likelihood of
      * collusion between workers.
      */
-    <J extends Job<A>,A extends Answer> A selectBestAnswer(List<J> jobs)
-        throws AnswerSelectionException, JobPostponedException {
-        assert(!jobs.isEmpty()) : "No job given to the answer selector";
+    <J extends Job<A>,A extends Result> A selectBestResult(List<J> jobs)
+        throws ResultSelectionException, JobPostponedException {
+        assert(!jobs.isEmpty()) : "No job given to the result selector";
         /* In case of other components than SilST */
         if (jobs.size() < 3)
-            throw new AnswerSelectionException();
+            throw new ResultSelectionException();
         /* Not enough job has been processed yet */
         if (gridCharacteristics.getCertainty() < MIN_CERTAINTY)
             throw new JobPostponedException();
-        Map<A,Set<Worker>> map = AnswerSelector.getJobsByAnswer(jobs);
+        Map<A,Set<Worker>> map = ResultSelector.getJobsByResult(jobs);
 
         /* It means it is the last step of the SilST approach and only strict
          * majority is needed (step 12) */
@@ -40,9 +40,9 @@ public class SilSTAnswerSelector extends AnswerSelector {
             /* This happen at the very end when the last jobs are
              * computed */
             List<J> lastJobs = jobs.subList(3,6);
-            AnswerSelector answerSelector = new StrictMajorityAnswerSelector();
-            logger.info("Return the best answer based on majority");
-            return answerSelector.selectLessWorseAnswer(lastJobs);
+            ResultSelector resultSelector = new StrictMajorityResultSelector();
+            logger.info("Return the best result based on majority");
+            return resultSelector.selectLessWorseResult(lastJobs);
         }
 
         /* This one fails if the M2 and M3 colluders detection has not been
@@ -50,27 +50,27 @@ public class SilSTAnswerSelector extends AnswerSelector {
         try {
             if (jobs.size() == 3 || jobs.size() == 5) {
                 double bestCollusion = 1.0d;
-                A bestAnswer = null;
+                A bestResult = null;
                 for (Map.Entry<A,Set<Worker>> entry : map.entrySet()) {
                     final double collusion = gridCharacteristics
                         .getCollusionLikelihood(entry.getValue());
                     if (collusion < bestCollusion) {
                         bestCollusion = collusion;
-                        bestAnswer = entry.getKey();
+                        bestResult = entry.getKey();
                     }
                 }
-                logger.fine("We have " + map.size() + " distinct answers");
+                logger.fine("We have " + map.size() + " distinct results");
                 /* In the case that every worker are colluders (step 10) */
                 if (bestCollusion > COLLUSION_THRESHOLD && jobs.size() == 3) {
                     logger.info("The current group is colluding");
-                    throw new AnswerSelectionException();
+                    throw new ResultSelectionException();
                 }
                 logger.info("The minimal collusion for job " + jobs.get(0)
                         + " is " + bestCollusion + " for a group of "
-                        + map.get(bestAnswer).size() + " workers on a total of "
+                        + map.get(bestResult).size() + " workers on a total of "
                         + jobs.size() + " executed jobs and corresponds to"
-                        + " answer " + bestAnswer);
-                return bestAnswer;
+                        + " result " + bestResult);
+                return bestResult;
             }
         } catch (TooMuchUncertaintyException e) {}
 
@@ -84,7 +84,7 @@ public class SilSTAnswerSelector extends AnswerSelector {
                             .getCollusionLikelihood(entry.getValue())
                             < COLLUSION_THRESHOLD) {
                         logger.info("One single honnest worker is defeated");
-                        throw new AnswerSelectionException();
+                        throw new ResultSelectionException();
                     }
                 /* It is accepted under the condition that there is not M2
                  * or M3 colluders in this group */
@@ -95,7 +95,7 @@ public class SilSTAnswerSelector extends AnswerSelector {
                 throw new JobPostponedException();
             else
                 /* In case of other components than SilST */
-                throw new AnswerSelectionException();
+                throw new ResultSelectionException();
         } catch (TooMuchUncertaintyException e) {}
 
         /* Normal behavior until the very end (should not be reached since
@@ -104,18 +104,18 @@ public class SilSTAnswerSelector extends AnswerSelector {
     }
 
     /**
-     * Returns an answer in every cases which is the less worse (based on
+     * Returns an result in every cases which is the less worse (based on
      * strict majority).
      */
-    <J extends Job<A>,A extends Answer> A selectLessWorseAnswer(List<J> jobs) {
-        assert(!jobs.isEmpty()) : "No job given to the answer selector";
+    <J extends Job<A>,A extends Result> A selectLessWorseResult(List<J> jobs) {
+        assert(!jobs.isEmpty()) : "No job given to the result selector";
         try {
-            return selectBestAnswer(jobs);
+            return selectBestResult(jobs);
         } catch (Exception e) {}
-        logger.info("The less worse answer will be selected in a group of size "
+        logger.info("The less worse result will be selected in a group of size "
                 + jobs.size());
-        AnswerSelector answerSelector = new StrictMajorityAnswerSelector();
-        return answerSelector.selectLessWorseAnswer(jobs);
+        ResultSelector resultSelector = new StrictMajorityResultSelector();
+        return resultSelector.selectLessWorseResult(jobs);
     }
 
 }

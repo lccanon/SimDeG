@@ -22,7 +22,7 @@ public class AbsoluteMajorityResultCertificator extends ResultCertificator {
 	/**
 	 * Returns the best result according to the strict majority.
 	 */
-	<J extends Job<R>, R extends Result> R selectBestResult(
+	<J extends Job, R extends Result> R selectBestResult(
 			List<Worker> workers, List<R> results)
 			throws ResultCertificationException {
 		assert (!results.isEmpty()) : "No job given to the result certificator";
@@ -51,7 +51,7 @@ public class AbsoluteMajorityResultCertificator extends ResultCertificator {
 	/**
 	 * Returns an result in every cases which is the less worse.
 	 */
-	<J extends Job<R>, R extends Result> R selectLessWorseResult(
+	<J extends Job, R extends Result> R selectLessWorseResult(
 			List<Worker> workers, List<R> results) {
 		try {
 			return selectBestResult(workers, results);

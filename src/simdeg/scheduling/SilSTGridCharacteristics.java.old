@@ -13,17 +13,17 @@ import java.lang.Double;
 /**
  * Implementation of the sabotage tolerant algorithm of Domingues et al.
  */
-public class SilSTGridCharacteristics<J extends Job<A>,A extends Answer>
+public class SilSTGridCharacteristics<J extends Job<A>,A extends Result>
     extends GridCharacteristics {
 
     /** Logger */
     private static final Logger logger
         = Logger.getLogger(SilSTGridCharacteristics.class.getName());
 
-    /** Number of computed jobs needed for starting to give answers */
+    /** Number of computed jobs needed for starting to give results */
     private static final long MAX_JOB_NUMBER = 10000L;
 
-    /** Number of computed jobs needed for starting to give answers */
+    /** Number of computed jobs needed for starting to give results */
     private static final double MAX_ERROR = 1E-3d;
 
     /** Keep information concerning executed jobs */
@@ -130,10 +130,10 @@ public class SilSTGridCharacteristics<J extends Job<A>,A extends Answer>
     }
 
     /**
-     * Specifies groups of workers giving distinct answers for a job.
+     * Specifies groups of workers giving distinct results for a job.
      */
     @SuppressWarnings("unchecked")
-    <J extends Job<A>, A extends Answer>
+    <J extends Job<A>, A extends Result>
         void setDistinctSet(J job, Set<Set<Worker>> workers) {
         Map<J,Set<Set<Worker>>> tmp = (Map<J,Set<Set<Worker>>>)workerSetByJob;
         tmp.put(job, workers);
@@ -190,7 +190,7 @@ public class SilSTGridCharacteristics<J extends Job<A>,A extends Answer>
 
     /**
      * Returns the estimated likelihoods that a worker will return the same
-     * wrong answer than each other.
+     * wrong result than each other.
      */
     public Map<Worker,Double> getCollusionLikelihood(Worker worker,
             Set<Worker> workers) {
@@ -214,7 +214,7 @@ public class SilSTGridCharacteristics<J extends Job<A>,A extends Answer>
 
     /**
      * Returns some fraction of colluders based on the internal values (workers
-     * returning together the same wrong answer). Throws an exception until all
+     * returning together the same wrong result). Throws an exception until all
      * colluders are identified (step 9 is done).
      */
     public double getColludersFraction() throws TooMuchUncertaintyException {
