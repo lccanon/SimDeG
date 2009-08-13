@@ -12,8 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.Logger;
 
-//class CollusionMatrix extends DynamicMatrix<Worker> {
-public class CollusionMatrix extends DynamicMatrix<Worker> {
+class CollusionMatrix extends DynamicMatrix<Worker> {
 
     /** Logger */
     private static final Logger logger
@@ -40,8 +39,8 @@ public class CollusionMatrix extends DynamicMatrix<Worker> {
         if (getEstimator(biggest, biggest).getMean()
                 < getEstimator(biggest, biggest).getError())
             return;
-//System.out.println("Readapt");
 
+        logger.fine("Readaptation is occuring");
         /* Store all previous values of the matrix */
         Map<Set<Worker>, Map<Set<Worker>, Estimator>> previousEstimates
             = new HashMap<Set<Worker>, Map<Set<Worker>, Estimator>>();
@@ -63,9 +62,11 @@ public class CollusionMatrix extends DynamicMatrix<Worker> {
                     estimator.subtract(previousEstimates.get(biggest).get(set));
                     estimator.subtract(previousEstimates.get(biggest).get(otherSet));
                     estimator.truncateRange(0.0d, 1.0d);
-//if (estimator.getError() < previousEstimates.get(set).get(otherSet).getError())
-//    System.out.println(previousEstimates.get(set).get(otherSet) + " " + previousEstimates.get(biggest).get(biggest) + " " + previousEstimates.get(biggest).get(set) + " " + previousEstimates.get(biggest).get(otherSet) + " = " + previousEstimates.get(set).get(otherSet).clone().add(previousEstimates.get(biggest).get(biggest)).subtract(previousEstimates.get(biggest).get(set)).subtract(previousEstimates.get(biggest).get(otherSet)) + " -> " + estimator);
                     setEstimator(set, otherSet, estimator);
+                    assert (estimator.getError()
+                            < previousEstimates.get(set).get(otherSet).getError())
+                        : "New estimator " + estimator
+                           + " acquired a better precision during readaptation";
                 }
     }
 
@@ -105,9 +106,6 @@ public class CollusionMatrix extends DynamicMatrix<Worker> {
     private final void testMerge(Set<Worker> set1, Set<Worker> set2) {
         if (set1 == set2)
             return;
-        final double error1 = getEstimator(set1, set1).getError();
-        final double error2 = getEstimator(set1, set2).getError();
-        final double error3 = getEstimator(set2, set2).getError();
         final double diff12 = Math.abs(getEstimator(set1, set1).getMean()
                 - getEstimator(set1, set2).getMean());
         final double diff23 = Math.abs(getEstimator(set1, set2).getMean()
@@ -126,34 +124,45 @@ public class CollusionMatrix extends DynamicMatrix<Worker> {
         double alpha = 1.0d;
         if (set1.size() + set2.size() > getBiggest().size()
                 && meanEstimate > 1.0d / (2.0d + set1.size() + set2.size()))
-            alpha = 2.1d;
+            alpha = 2.5d;
         /* A single number of necessary observation for merging is not
          * sufficient, because we want to promote merging of small sets (where
          * it is likelely that more colluding workers are present) and limit it
          * for larger sets (the dominant set should be still) */
-        // XXX take into account the difference between the product (1.0d -
-        // diff12) * (1.0d - diff13) * (1.0d - diff23) and the best achievable
-        // at this iteration
         final double sampleCountLimit = (set1.size() + set2.size()) * alpha
             / ((1.0d - diff12) * (1.0d - diff13) * (1.0d - diff23));
-        if (diff12 < error1 + error2 && diff23 < error2 + error3 && diff13 < error1 + error3
-                && getEstimator(set1, set1).getSampleCount() > sampleCountLimit
-                && getEstimator(set1, set2).getSampleCount() > sampleCountLimit
-                && getEstimator(set2, set2).getSampleCount() > sampleCountLimit) {
-//System.out.println("Merge when " + getEstimator(set1, set1) + " " +
-//        getEstimator(set1, set2) + " " + getEstimator(set2, set2) + " " +
-//        getEstimator(set1, set2).getSampleCount() + " "
-//        + sampleCountLimit + " " + set1 + " " + set2);
-            final Set<Worker> previousBiggest = getBiggest();
-            merge(set1, set2);
-            /* Readapt if needed */
-            readapt(previousBiggest);
-        }
+        if (getEstimator(set1, set1).getSampleCount() <= sampleCountLimit
+                || getEstimator(set1, set2).getSampleCount() <= sampleCountLimit
+                || getEstimator(set2, set2).getSampleCount() <= sampleCountLimit)
+            return;
+        // XXX take into account the difference between the product (1.0d -
+        // diff12) * (1.0d - diff13) * (1.0d - diff23) and the best achievable
+        // at this iteration and don't use errors.
+        final double error1 = getEstimator(set1, set1).getError();
+        final double error2 = getEstimator(set1, set2).getError();
+        final double error3 = getEstimator(set2, set2).getError();
+        if (diff12 > error1 + error2 || diff23 > error2 + error3
+                || diff13 > error1 + error3)
+            return;
+        /* A second limit is imposed in the case most sets are already
+         * merged. It allows to not merge singleton that should rather be
+         * merge with big set. */
+        final double newCountLimit = sampleCountLimit / (set1.size()
+                + set2.size()) * getAll().size() / getSets(getAll()).size();
+        if (getEstimator(set1, set1).getSampleCount() <= newCountLimit
+                || getEstimator(set1, set2).getSampleCount() <= newCountLimit
+                || getEstimator(set2, set2).getSampleCount() <= newCountLimit)
+            return;
+        final Set<Worker> previousBiggest = getBiggest();
+        merge(set1, set2);
+        /* Readapt if needed */
+        readapt(previousBiggest);
     }
 
     @SuppressWarnings("unchecked")
     protected final Estimator[][] getCollusions(Set<? extends Worker> workers) {
-        final List<Set<Worker>> sets = new ArrayList<Set<Worker>>(getSets(workers));
+        final List<Set<Worker>> sets
+            = new ArrayList<Set<Worker>>(getSets(workers));
         Estimator[][] result = new Estimator[sets.size()][sets.size()];
         for (int i=0; i<result.length; i++)
             for (int j=0; j<result[i].length; j++)

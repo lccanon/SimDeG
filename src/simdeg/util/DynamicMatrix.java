@@ -148,7 +148,7 @@ public class DynamicMatrix<E> {
         testValidSet(set1, set2);
         if (set1.containsAll(set2) || set2.containsAll(set1))
             return null;
-        logger.finer("Merging of set " + set1 + " and " + set2);
+        logger.fine("Merging of sets " + set1 + " and " + set2);
         /* Merge by putting set2 in set1 */
         Set<E> merge = new HashSet<E>();
         merge.addAll(set1);
@@ -176,7 +176,7 @@ public class DynamicMatrix<E> {
         testValidSet(set);
         if (set.size() == 1 || !set.contains(element))
             return;
-        logger.finer("Splitting of elements " + element + " in set " + set);
+        logger.fine("Splitting of element " + element + " from set " + set);
         /* Create a new set without the element */
         Set<E> initialSet = new HashSet<E>(set);
         initialSet.remove(element);
@@ -185,9 +185,8 @@ public class DynamicMatrix<E> {
         /* Insert these new sets into the matrix */
         insertSet(initialSet);
         insertSet(newSet);
-        /* Copy the estimators between the initial set and the new sets */
-        copyEstimator(set, initialSet);
-        //copyEstimator(set, newSet);
+        /* At this point, the previous estimators were copied. But, it is now
+         * useless. */
         /* Clean matrix by removing the first set */
         clean(set);
         /* Update reverse for all concerned elements */
@@ -292,17 +291,14 @@ public class DynamicMatrix<E> {
         return true;
     }
 
-    public void print() {
-        for (Set<E> set1 : matrix.keySet()) {
-            System.out.print("(" + set1.size() + "): ");
-            // TODO remore the 2 following lines
-            for (E e : set1)
-                System.out.print(e + " ");
-            for (Set<E> set2 : matrix.keySet())
-                System.out.print(" " + getEstimator(set1, set2));
-            System.out.println();
-
-        }
+    public String toString() {
+        StringBuilder stbuild = new StringBuilder();
+        for (Set<E> set1 : matrix.keySet())
+            stbuild.append("(" + set1.size() + "): "
+                    + Arrays.toString(set1.toArray()) + " = "
+                    + Arrays.toString(matrix.get(set1).values().toArray())
+                    + '\n');
+        return stbuild.toString();
     }
 
 }

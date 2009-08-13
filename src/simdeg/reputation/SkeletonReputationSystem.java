@@ -27,7 +27,7 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
      * of similar events which would pertube the estimators. Additionally, the
      * logic is to observe behavior between group, not individual.
 	 */
-    protected final Map<Job, Map<Set<Worker>, Set<Set<Worker>>>> updatedSets
+    private final Map<Job, Map<Set<Worker>, Set<Set<Worker>>>> updatedSets
         = new HashMap<Job, Map<Set<Worker>, Set<Set<Worker>>>>();
 
 	/**
@@ -35,6 +35,10 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
 	 */
 	public void setWorkerResult(Worker worker, Job job, Result result) {
         super.setWorkerResult(worker, job, result);
+
+        /* Update structure for each new job */
+        if (!updatedSets.containsKey(job))
+            updatedSets.put(job, new HashMap<Set<Worker>, Set<Set<Worker>>>());
 
 		/* Update collusion when this is the second result for this job */
         final Map<Result, Set<Worker>> workersByResult = workersByResults.get(job);
@@ -83,11 +87,8 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
 	 */
 	public void setCertifiedResult(Job job, Result result) {
 		Map<Result, Set<Worker>> workersByResult = workersByResults.get(job);
-		if (!workersByResult.containsKey(result))
-			throw new NoSuchElementException(
-					"Job never met before by the reputation system");
 
-		/* Inform in the grid characteristics which groups give separate results */
+		/* Inform in the grid characteristics which group gives separate results */
 		Set<Set<Worker>> sets = new HashSet<Set<Worker>>();
 		Set<Worker> winningSet = new HashSet<Worker>();
 		for (Result otherResult : workersByResult.keySet()) {
@@ -99,6 +100,8 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
 		}
 		setDistinctSets(job, winningSet, sets);
 
+		updatedSets.remove(job);
+
         super.setCertifiedResult(job, result);
 	}
 
@@ -108,13 +111,16 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
      */
     protected boolean updateInteraction(Job job, Worker worker, Worker
             otherWorker, Set<Worker> setWorker, Set<Worker> setOtherWorker) {
+        if (!updatedSets.containsKey(job))
+            return false;
+
         final Map<Set<Worker>, Set<Set<Worker>>> updatedSet = updatedSets.get(job);
         /* Fill the structure for easing the code that follows */
         if (!updatedSet.containsKey(setWorker))
             updatedSet.put(setWorker, new HashSet<Set<Worker>>());
         if (!updatedSet.containsKey(setOtherWorker))
             updatedSet.put(setOtherWorker, new HashSet<Set<Worker>>());
-        /* Performs the upsate if it is relevant (not already observed) */
+        /* Performs the update if it is relevant (not already observed) */
         if (!updatedSet.get(setWorker).contains(setOtherWorker)) {
             /* Update the interactions already observed */
             updatedSet.get(setWorker).add(setOtherWorker);
@@ -131,6 +137,9 @@ public abstract class SkeletonReputationSystem extends ReliableReputationSystem 
     protected void adaptInteractionStructure(Job job,
             Set<Worker> setWorker, Set<Worker> setOtherWorker,
             Set<Worker> newSetWorker, Set<Worker> newSetOtherWorker) {
+        if (!updatedSets.containsKey(job))
+            return;
+
         final Map<Set<Worker>, Set<Set<Worker>>> updatedSet = updatedSets.get(job);
         if (newSetWorker == newSetOtherWorker && newSetWorker != setWorker) {
             /* In case of merge */

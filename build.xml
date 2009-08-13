@@ -27,7 +27,7 @@
       <compilerarg value="-Xlint"/>
     </javac>
   </target>
-  <target name="jar" depends="compile">
+  <target name="jar" depends="compile,compile-test">
     <jar destfile="${jar-file}" basedir="${build-dir}"
          includes="**/*.class" excludes="**/Test*.class">
       <manifest>
@@ -77,7 +77,7 @@
       <batchtest fork="yes" todir="${report-dir}">
         <formatter type="xml"/>
         <fileset dir="${build-dir}">
-          <include name="**/reputation/simulation/TestEv*.class"/>
+          <include name="**/Test*.class"/>
 <!--
           <include name="**/reputation/Test*.class"/>
           <include name="**/util/Test*.class"/>

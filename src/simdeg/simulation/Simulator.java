@@ -294,6 +294,7 @@ class Simulator {
                 Scanner scannerComment = new Scanner(nextLine);
                 scannerComment.useDelimiter("#");
                 Scanner scannerLine = new Scanner(scannerComment.next());
+                scannerComment.close();
                 scannerLine.useDelimiter(" = ");
                 if (scannerLine.hasNext()){
                     String name = scannerLine.next();

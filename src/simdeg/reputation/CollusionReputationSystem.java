@@ -50,8 +50,6 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	 */
 	protected void setAgreement(Job job, Worker worker, Set<Worker> workers) {
 		assert (!workers.isEmpty()) : "Not enough workers in group";
-		if (!updatedSets.containsKey(job))
-			updatedSets.put(job, new HashMap<Set<Worker>, Set<Set<Worker>>>());
 	}
 
 	/**
@@ -59,8 +57,6 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	 */
 	protected void setDisagreement(Job job, Worker worker, Set<Worker> workers) {
 		assert (workers.size() > 1) : "Not enough workers in group";
-		if (!updatedSets.containsKey(job))
-			updatedSets.put(job, new HashMap<Set<Worker>, Set<Set<Worker>>>());
         final Set<Worker> setWorker = collusion.getSet(worker);
         /* Split the workers from every set with which it disagrees */
         for (Worker otherWorker : workers) {
@@ -92,7 +88,6 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	 */
 	protected void setDistinctSets(Job job, Set<Worker> winningWorkers,
 			Set<Set<Worker>> workers) {
-        assert (!winningWorkers.isEmpty()) : "No winning workers";
         /* Non-colluders */
         /* Begin with diagonal */
         for (Worker worker : winningWorkers) {
@@ -131,7 +126,6 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
                     }
                 }
         }
-		updatedSets.remove(job);
 	}
 
 	/**
@@ -140,16 +134,17 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	 */
 	public RV getCollusionLikelihood(Set<? extends Worker> workers) {
 		final RV[][] proba = collusion.getCollusions(workers);
-		RV estimator = new Beta(1.0d);
+		RV rv = new Beta(1.0d);
 		for (int i = 0; i < proba.length; i++)
 			for (int j = i; j < proba[i].length; j++)
-				estimator = min(estimator, proba[i][j]);
-		assert (estimator.getMean() >= 0.0d) : "Negative estimate: "
-				+ estimator.getMean();
+				rv = min(rv, proba[i][j]);
+
+		assert (rv.getMean() >= 0.0d) : "Negative estimate: "
+				+ rv.getMean();
 
 		logger.finest("Estimated collusion likelihood of " + workers.size()
-				+ " workers is " + estimator);
-		return estimator;
+				+ " workers is " + rv);
+		return rv;
 	}
 
 	/**
@@ -189,11 +184,8 @@ public class CollusionReputationSystem extends SkeletonReputationSystem {
 	}
 
     public String toString() {
-        return "collusion-based reputation system";
+        return super.toString() + "Collusion-based reputation system:\n"
+            + collusion.toString();
     }
-
-    protected void print() {
-        collusion.print();
-    }    
 
 }

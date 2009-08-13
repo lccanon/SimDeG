@@ -1,4 +1,4 @@
-package simdeg.reputation.simulation;
+package simdeg.simulation;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -104,10 +104,13 @@ public class TestEvaluator {
         }
     }
 
+    /*
     @Test public void evaluator() {
         new Evaluator(getReputationSystem());
     }
+    */
 
+    /*
     @Test public void setStep() {
         Evaluator evaluator = new Evaluator(getReputationSystem());
         Map<Worker,Switcher<Double>> workersReliability = new HashMap<Worker,Switcher<Double>>();
@@ -117,7 +120,9 @@ public class TestEvaluator {
         for (int i=0; i<100; i++)
             evaluator.setStep(i);
     }
+    */
 
+    /*
     @Test(expected=OutOfRangeException.class)
         public void setStepException() {
         Evaluator evaluator = new Evaluator(getReputationSystem());
@@ -127,11 +132,13 @@ public class TestEvaluator {
         evaluator.setWorkersFaultiness(workersReliability, buggingGroups);
         evaluator.setStep(-1);
     }
+    */
 
     /**
      * Test that the number of checked collusion values corresponds to the
      * number of possible combination between each group.
      */
+    /*
     @SuppressWarnings("unchecked")
     @Test public void convertCollusion() {
         Set<Set<Worker>> sets= new HashSet<Set<Worker>>();
@@ -154,5 +161,6 @@ public class TestEvaluator {
         Map<Set<Worker>, Double> result = evaluator.convertCollusion(map);
         assertEquals(11 * 10 / 2, result.size());
     }
+    */
 
 }

@@ -1,15 +1,20 @@
 package simdeg.reputation.simulation;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.Scanner;
+import java.util.Locale;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.TreeMap;
 import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import simdeg.reputation.ReputationSystem;
-import simdeg.util.Switcher;
 import simdeg.util.RV;
 import simdeg.util.OutOfRangeException;
 
@@ -29,26 +34,33 @@ class Evaluator {
     /** Simulator time */
     private static long startTime = System.currentTimeMillis();
 
-    /**
-     * Constructor specifying the measured reputation system.
-     */
-    protected Evaluator(ReputationSystem reputationSystem) {
-        this.reputationSystem = reputationSystem;
-    }
-
     private double realFraction;
 
     private RV previousFraction;
 
-    private Map<Worker, Double> realReliability;
+    private Map<Worker, Double> realReliability = new HashMap<Worker, Double>();
 
     private Map<Worker, RV> previousReliability = new HashMap<Worker, RV>();
 
-    private Map<Set<Worker>, Double> realCollusion;
+    private Map<Set<Worker>, Double> realCollusion = new HashMap<Set<Worker>, Double>();
 
     private Map<Set<Worker>, RV> previousCollusion = new HashMap<Set<Worker>, RV>();
 
-    protected Map<Set<Worker>, Double> convertCollusion(Map<Set<Worker>,
+    /**
+     * Constructor specifying the measured reputation system.
+     */
+    protected Evaluator(ReputationSystem reputationSystem,
+            String fileCharacteristic) {
+        this.reputationSystem = reputationSystem;
+        /* Read characteristic file */
+        readCharacteristicFile(fileCharacteristic);
+        logger.info("timestamp,simulation time,"
+                + "fraction RMSD,fraction error RMSD,fraction smoothness,"
+                + "reliability RMSD,reliability error RMSD,reliability smoothness,"
+                + "collusion RMSD,collusion error RMSD,collusion smoothness");
+    }
+
+    private Map<Set<Worker>, Double> convertCollusion(Map<Set<Worker>,
             Map<Set<Worker>, Double>> collusion) {
         Map<Set<Worker>, Double> result = new HashMap<Set<Worker>, Double>();
         for (Set<Worker> set : collusion.keySet())
@@ -60,6 +72,53 @@ class Evaluator {
         return result;
     }
 
+    private void readCharacteristicFile(String fileCharacteristic) {
+        Scanner scanner = null;
+        try {
+            scanner = new Scanner(new File(fileCharacteristic));
+        } catch (FileNotFoundException e) {
+            logger.log(Level.SEVERE, "File " + fileCharacteristic + " was not found", e);
+            System.exit(1);
+        }
+        scanner.useLocale(Locale.ENGLISH);
+
+        /* Parse reliability and colluding group */
+        final Map<Integer, Set<Worker>> colGroups = new TreeMap<Integer, Set<Worker>>();
+        final int workerCount = scanner.nextInt();
+        for (int i = 0 ; i < workerCount ; i++) {
+            Worker worker = new Worker(scanner.nextLong());
+            this.realReliability.put(worker, scanner.nextDouble());
+            final Integer group = scanner.nextInt();
+            if (!colGroups.containsKey(group))
+                colGroups.put(group, new HashSet<Worker>());
+            colGroups.get(group).add(worker);
+        }
+        logger.config("Reliability characteristics read");
+
+        /* Compute fraction of colluders */
+        realFraction = 1.0d - (double)colGroups.get(0).size()
+            / this.realReliability.size();
+        logger.config("Colluder fraction computed: " + realFraction);
+
+        /* Parse collusion probabilities */
+        final Map<Set<Worker>, Map<Set<Worker>, Double>> collusion
+            = new HashMap<Set<Worker>, Map<Set<Worker>, Double>>();
+        for (Integer i : colGroups.keySet()) {
+            final Set<Worker> groupI = colGroups.get(new Integer(i));
+            collusion.put(groupI, new HashMap<Set<Worker>, Double>());
+            for (Integer j : colGroups.keySet())
+                collusion.get(groupI).put(colGroups.get(j),
+                        scanner.nextDouble());
+        }
+        scanner.close();
+        this.realCollusion = convertCollusion(collusion);
+        logger.config("Collusion characteristics read");
+    }
+
+    protected Set<Worker> getAllWorkers() {
+        return realReliability.keySet();
+    }
+
     private List<List<Double>> performMeasures() {
         /* Fraction case */
         List<MetricStructure> frac = new ArrayList<MetricStructure>();
@@ -69,6 +128,7 @@ class Evaluator {
                         estimation, previousFraction));
             previousFraction = estimation.clone();
         }
+
         /* Reliability case */
         List<MetricStructure> rel = new ArrayList<MetricStructure>();
         for (Worker worker : realReliability.keySet()) {
@@ -77,6 +137,7 @@ class Evaluator {
                         estimation, previousReliability.get(worker)));
             previousReliability.put(worker, estimation.clone());
         }
+
         /* Collusion case */
         List<MetricStructure> col = new ArrayList<MetricStructure>();
         for (Set<Worker> set : realCollusion.keySet()) {
@@ -85,6 +146,7 @@ class Evaluator {
                         estimation, previousCollusion.get(set)));
             previousCollusion.put(set, estimation.clone());
         }
+
         /* Get the metrics' values */
         List<List<Double>> result = new ArrayList<List<Double>>();
         result.add(MetricStructure.computeMetric(frac));
@@ -96,116 +158,18 @@ class Evaluator {
     /**
      * Notifies the progress of the simulation.
      */
-    protected void setStep(int step) {
-        if (step < 0)
-            throw new OutOfRangeException(step, 0, Integer.MAX_VALUE);
+    protected void setStep(long timestamp) {
+        if (timestamp < 0)
+            throw new OutOfRangeException(timestamp, 0, Long.MAX_VALUE);
 
-        if (step == 0)
-            logger.info("Step,simulation time,"
-                    + "fraction RMSD,fraction error RMSD,fraction smoothness,"
-                    + "reliability RMSD,reliability error RMSD,reliability smoothness,"
-                    + "collusion RMSD,collusion error RMSD,collusion smoothness");
-
-        realFraction = computeFraction(step);
-        realReliability = computeReliability(step);
-        realCollusion = convertCollusion(computeCollusion(step));
-        
         List<List<Double>> measures = performMeasures();
 
         logger.info(String.format("%d,%12g,%12g,%12g,%12g,%12g,%12g,%12g,"
-                    + "%12g,%12g,%12g", step,
+                    + "%12g,%12g,%12g", timestamp,
                     (System.currentTimeMillis() - startTime) * 1E-3d,
                     measures.get(0).get(0), measures.get(0).get(1), measures.get(0).get(2),
                     measures.get(1).get(0), measures.get(1).get(1), measures.get(1).get(2),
                     measures.get(2).get(0), measures.get(2).get(1), measures.get(2).get(2)));
-    }
-
-    /* TODO delete */
-    /** Pool of workers which are simulated */
-    private Set<Worker> workers = null;
-
-    /* TODO delete */
-    /** Workers true reliability */
-    private Map<Worker,Switcher<Double>> reliability
-        = new HashMap<Worker,Switcher<Double>>();
-
-    /* TODO delete */
-    /** Workers true bugging groups */
-    private Map<Worker,Switcher<Set<CollusionGroup>>> bugging
-        = new HashMap<Worker,Switcher<Set<CollusionGroup>>>();
-
-    /* TODO delete */
-    /**
-     * Constructs internal reliability and collusion matrices.
-     */
-    protected void setWorkersFaultiness(
-            Map<Worker,Switcher<Double>> workersReliability,
-            Map<Worker,Switcher<Set<CollusionGroup>>> buggingGroups) {
-
-        /* Don't do it twice */
-        if (this.workers != null)
-            return;
-
-        /* Quick check of input */
-        if (workersReliability.size() != buggingGroups.size())
-            throw new IllegalArgumentException("Worker faultiness malformed");
-
-        this.workers = workersReliability.keySet();
-        reliability.putAll(workersReliability);
-        bugging.putAll(buggingGroups);
-    }
-
-    /* TODO change */
-    private double computeFraction(int step) {
-        /* Keep track of colluder fraction */
-        int colluders = 0;
-        for (Worker worker : workers)
-            if (!bugging.get(worker).get(step).isEmpty())
-                colluders++;
-        return (double)colluders / workers.size();
-    }
-
-    /* TODO change */
-    private Map<Worker, Double> computeReliability(int step) {
-        Map<Worker, Double> result = new HashMap<Worker, Double>();
-        for (Worker worker : reliability.keySet())
-            result.put(worker, reliability.get(worker).get(step));
-        return result;
-    }
-
-    /* TODO change */
-    private Map<Set<Worker>,Map<Set<Worker>,Double>> computeCollusion(int step) {
-        Map<Set<CollusionGroup>, Set<Worker>> transform = new
-            HashMap<Set<CollusionGroup>, Set<Worker>>();
-        for (Worker worker : workers) {
-            final Set<CollusionGroup> groups = bugging.get(worker).get(step);
-            if (!transform.containsKey(groups))
-                transform.put(groups, new HashSet<Worker>());
-            transform.get(bugging.get(worker).get(step)).add(worker);
-        }
-
-        Map<Set<Worker>,Map<Set<Worker>,Double>> result
-            = new HashMap<Set<Worker>,Map<Set<Worker>,Double>>();
-        for (Set<CollusionGroup> set1 : transform.keySet()) {
-            result.put(transform.get(set1), new HashMap<Set<Worker>,Double>());
-            for (Set<CollusionGroup> set2 : transform.keySet()) {
-                final Set<CollusionGroup> inter = new HashSet<CollusionGroup>(set1);
-                inter.retainAll(set2);
-                final Set<CollusionGroup> notInter = new HashSet<CollusionGroup>(set1);
-                notInter.addAll(set2);
-                notInter.removeAll(inter);
-                double probaDistinct = 0.0d;
-                for (CollusionGroup group : notInter)
-                    probaDistinct += (1.0d - probaDistinct) * group.getProbability();
-                double proba = 0.0d;
-                for (CollusionGroup group : inter)
-                    proba += (1.0d - proba) * group.getProbability();
-                result.get(transform.get(set1)).put(transform.get(set2),
-                        proba * (1.0d - probaDistinct));
-            }
-        }
-
-        return result;
     }
 
 }

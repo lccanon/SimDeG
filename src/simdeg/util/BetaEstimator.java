@@ -82,10 +82,21 @@ public class BetaEstimator extends Estimator {
         this.beta = new Beta(0.0d, 1.0d, alpha, beta);
     }
 
+    public BetaEstimator clone() {
+        return new BetaEstimator(getAlpha(), getBeta());
+    }
+
+    private final double roundIfNearInt(double value) {
+        final double rounded = round(value);
+        if (abs(rounded - value) < EPSILON)
+            return rounded;
+        return value;
+    }
+
     protected BetaEstimator set(double lower, double upper,
             double estimate, double variance) {
         super.set(lower, upper, estimate, variance);
-        beta.truncateRange(lower, upper);
+        beta.setRange(lower, upper);
 
         /* Normalize estimate and variance */
         double normalizedEstimate = Math.max(0.0d, Math.min(1.0d,
@@ -101,8 +112,7 @@ public class BetaEstimator extends Estimator {
         if (normalizedVariance > product * normalizedEstimate
                 / (1.0d + normalizedEstimate) || normalizedVariance > product
                 * (1.0d - normalizedEstimate) / (2.0d - normalizedEstimate))
-            return setSpecific(lower, upper,
-                    normalizedEstimate, normalizedVariance);
+            return setSpecific(normalizedEstimate, normalizedVariance);
 
         /* Optimization */
         if (estimate == getMean() && variance == getVariance())
@@ -112,12 +122,10 @@ public class BetaEstimator extends Estimator {
                 normalizedVariance * (upper - lower) * (upper - lower));
 
         /* For keeping errors low */
-        if (abs(round(getAlpha()) - getAlpha()) < EPSILON
-                && round(getAlpha()) != 0.0d)
-            beta.setAlpha(round(getAlpha()));
-        if (abs(round(getBeta()) - getBeta()) < EPSILON
-                && round(getBeta()) != 0.0d)
-            beta.setBeta(round(getBeta()));
+        if (round(getAlpha()) != 0.0d)
+            beta.setAlpha(roundIfNearInt(getAlpha()));
+        if (round(getBeta()) != 0.0d)
+            beta.setBeta(roundIfNearInt(getBeta()));
 
         return this;
     }
@@ -128,8 +136,8 @@ public class BetaEstimator extends Estimator {
      * estimate later), while having alpha and beta greater than 1
      * (necessity for an Estimator).
      */
-    private BetaEstimator setSpecific(double lower, double upper,
-            double normalizedEstimate, double normalizedVariance) {
+    private BetaEstimator setSpecific(double normalizedEstimate,
+            double normalizedVariance) {
         final double alpha = 2.0d / 3.0d * sqrt((normalizedVariance + 3.0d)
                 / normalizedVariance)
             * sin((atan(3.0d / (normalizedVariance + 18.0d)
@@ -147,8 +155,17 @@ public class BetaEstimator extends Estimator {
         return this;
     }
 
-    public BetaEstimator clone() {
-        return new BetaEstimator(getAlpha(), getBeta());
+    /**
+     * Override RV.opposite for performance reason.
+     */
+    protected BetaEstimator opposite() {
+        super.set(-this.upper, -this.lower, 0.0d, 0.0d);
+        beta.setRange(this.lower, this.upper);
+        final double alphaValue = getBeta();
+        final double betaValue = getAlpha();
+        beta.setAlpha(alphaValue);
+        beta.setBeta(betaValue);
+        return this;
     }
 
     /**
@@ -169,6 +186,15 @@ public class BetaEstimator extends Estimator {
      */
     public double getSampleCount() {
         return getAlpha() + getBeta() - 2.0d;
+    }
+
+    public double getSampleCount(double value) {
+        if (value == 1.0d)
+            return roundIfNearInt(getAlpha() - 1.0d);
+        if (value == 0.0d)
+            return roundIfNearInt(getBeta() - 1.0d);
+        throw new IllegalArgumentException
+            ("Estimator designed for Bernoulli trial only");
     }
 
     public double sampleCountLimit(double error) {
@@ -196,13 +222,7 @@ public class BetaEstimator extends Estimator {
     }
 
     public String toString() {
-        java.text.DecimalFormat df = new java.text.DecimalFormat("0.##",
-                new java.text.DecimalFormatSymbols(java.util.Locale.ENGLISH));
-        return "{" + df.format(getMean()) + ","
-            + df.format(getError()) + "}/(" + df.format(getAlpha()) + ","
-            + df.format(getBeta()) + ","
-            + df.format(beta.getLowerEndpoint()) + ","
-            + df.format(beta.getUpperEndpoint()) + ")";
+        return beta.toString();
     }
 
 }

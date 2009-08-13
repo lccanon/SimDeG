@@ -24,15 +24,15 @@ public class TestJob {
         Job job1 = new Job("test", 123d, null, 12d);
         Job job2 = new Job("tes", 123d, null, 12d);
         Job job3 = new Job("test", 12d, null, 1d);
-        assertTrue(job1.equals(job1));
-        assertFalse(job1.equals(job2));
-        assertTrue(job1.equals(job3));
+        assertTrue("Jobs should be equal", job1.equals(job1));
+        assertFalse("Jobs shouldn't be equal", job1.equals(job2));
+        assertTrue("Jobs should be equal", job1.equals(job3));
     }
 
     @Test public void duplicate() throws JniException, NativeException {
         Job job = new Job("test", 123d, null, 12d);
         Job duplicate = job.duplicate(null);
-        assertTrue(job.equals(duplicate));
+        assertTrue("Jobs should be equal", job.equals(duplicate));
     }
 
 }

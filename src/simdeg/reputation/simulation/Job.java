@@ -1,34 +1,17 @@
 package simdeg.reputation.simulation;
 
-import java.util.logging.Logger;
-
 /**
  * A Job is created and is submitted to workers whith duplication.
  */
 class Job implements simdeg.reputation.Job {
 
-    /** Logger */
-    private static final Logger logger
-        = Logger.getLogger(Job.class.getName());
+    private long id;
 
     /**
      * Used during workload creation.
      */
-    protected Job() {
-    }
-
-    /**
-     * Used during duplicationg.
-     */
-    private Job(int hash) {
-        this.hash = hash;
-    }
-
-    /**
-     * Used when the algorithm duplicates a Job and associates it to a Worker.
-     */
-    protected Job duplicate() {
-        return new Job(hashCode());
+    protected Job(long id) {
+        this.id = id;
     }
 
     /**
@@ -36,27 +19,19 @@ class Job implements simdeg.reputation.Job {
      * can exist (for each worker).
      */
     public boolean equals(Object aJob) {
-        if (this == aJob)
-            return true;
-        if (!(aJob instanceof Job))
-            return false;
-        Job job = (Job)aJob;
-        if (hash == job.hashCode())
-            return true;
-        return false;
+        return this == aJob
+            || (aJob instanceof Job && id == aJob.hashCode());
     }
 
-    private static int count = 0;
-    private int hash = count++;
     /**
      * Used for HashSet.
      */
     public int hashCode() {
-        return hash;
+        return (int)id;
     }
 
     public String toString() {
-        return "job" + hash;
+        return "job" + id;
     }
 
 }

@@ -35,14 +35,18 @@ public class TestCollusionMatrix {
         workers1 = new HashSet<Worker>();
         for (int i=0; i<10; i++) {
             final int hash = i * 2;
-            workers1.add(new Worker() {public int hashCode() {
-                    return hash; }/*public String toString(){return "1";}*/});
+            workers1.add(new Worker() {
+                    public int hashCode() { return hash; }
+                    public String toString() { return "1"; }
+                    });
         }
         workers2 = new HashSet<Worker>();
         for (int i=0; i<29; i++) {
             final int hash = i * 2 + 1;
-            workers2.add(new Worker() {public int hashCode() {
-                    return hash; }/*public String toString(){return "2";}*/});
+            workers2.add(new Worker() {
+                    public int hashCode() { return hash; }
+                    public String toString() { return "2"; }
+                    });
         }
         workers = new HashSet<Worker>();
         workers.addAll(workers1);
@@ -155,13 +159,8 @@ public class TestCollusionMatrix {
                     matrix.decreaseCollusion(worker, otherWorker);
                     matrix.decreaseCollusion(otherWorker, worker);
                 }
-            /* Simulate the reputation system additional mechanism for
-             * splitting */
-            // TODO remove when a mechanism will detect this
-            for (Worker worker : workers1)
-                for (Worker otherWorker : workers2)
-                    if (matrix.getSet(worker) == matrix.getSet(otherWorker))
-                        matrix.split(matrix.getSet(otherWorker), otherWorker);
+            System.out.println(i);
+            matrix.print();
         }
         assertEquals(workers2.size(), matrix.getBiggest().size());
         final RV[][] collusion = matrix.getCollusions(workers);
@@ -193,13 +192,6 @@ public class TestCollusionMatrix {
                     matrix.decreaseCollusion(worker, otherWorker);
                     matrix.decreaseCollusion(otherWorker, worker);
                 }
-            /* Simulate the reputation system additional mechanism for
-             * splitting */
-            // TODO remove when a mechanism will detect this
-            for (Worker worker : workers1)
-                for (Worker otherWorker : workers2)
-                    if (matrix.getSet(worker) == matrix.getSet(otherWorker))
-                        matrix.split(matrix.getSet(otherWorker), otherWorker);
         }
         assertEquals(workers2.size(), matrix.getBiggest().size());
         final RV[][] collusion = matrix.getCollusions(workers);

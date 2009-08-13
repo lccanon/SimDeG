@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.logging.Logger;
 
@@ -77,9 +78,6 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 	 */
 	public void setCertifiedResult(Job job, Result result) {
 		Map<Result, Set<Worker>> workersByResult = workersByResults.get(job);
-		if (!workersByResult.containsKey(result))
-			throw new NoSuchElementException(
-					"Job never met before by the reputation system");
 
 		/*
 		 * Remove every colluding group of results and consider the rest as
@@ -108,13 +106,9 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 	}
 
     public String toString() {
-        return "reliability-based reputation system";
-    }
-
-    protected void print() {
-        for (Worker worker : workers)
-            System.out.print(" " + reliability.get(worker));
-        System.out.println();
+        return "Reliability-based reputation system:\n"
+            + Arrays.toString(workers.toArray()) + " = "
+            + Arrays.toString(reliability.values().toArray()) + '\n';
     }
 
 }

@@ -28,10 +28,16 @@ public abstract class Estimator extends RV {
     public abstract void setSample(double value);
 
     /**
-     * Number of observed values. Due to arithmetic operation, this values can
+     * Number of observed values. Due to arithmetic operations, this values can
      * be real.
      */
     public abstract double getSampleCount();
+
+    /**
+     * Number of observed values equals to values. Due to arithmetic operations,
+     * this values can be real.
+     */
+    public abstract double getSampleCount(double value);
 
     /**
      * The number of measures to do in order to have an error lower that the

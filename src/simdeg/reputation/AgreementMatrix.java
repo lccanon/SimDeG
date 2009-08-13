@@ -10,8 +10,7 @@ import simdeg.util.Estimator;
 import simdeg.util.DynamicMatrix;
 import simdeg.util.OutOfRangeException;
 
-//class AgreementMatrix extends DynamicMatrix<Worker> {
-public class AgreementMatrix extends DynamicMatrix<Worker> {
+class AgreementMatrix extends DynamicMatrix<Worker> {
 
     /** Logger */
     private static final Logger logger
@@ -34,10 +33,9 @@ public class AgreementMatrix extends DynamicMatrix<Worker> {
         /* Update estimator */
         getEstimator(set1, set2).setSample(1.0d);
         /* Test the possibility of merging both sets */
-        if (set1 != set2 && getEstimator(set1, set2).getMean()
-                > 1.0d - 1.0d / (2.0d + set1.size() + set2.size())
-                && getEstimator(set1, set2).getMean()
-                > 1.0d - getEstimator(set1, set2).getError())
+        if (set1 != set2 && getEstimator(set1, set2).getSampleCount()
+                > set1.size() + set2.size()
+                && getEstimator(set1, set2).getSampleCount(0.0d) == 0.0d)
             merge(set1, set2);
     }
 
@@ -73,9 +71,8 @@ public class AgreementMatrix extends DynamicMatrix<Worker> {
         final Set<Worker> biggest = getBiggest();
         int count = 0;
         for (Set<Worker> set : getSets(getAll()))
-            if (getEstimator(set, biggest).getMean() > 1.0d - 1.0d / (2.0d
-                        + set.size()) && getEstimator(set, biggest).getMean() >
-                    1.0d - getEstimator(set, biggest).getError())
+            if (getEstimator(set, biggest).getSampleCount() > set.size()
+                    && getEstimator(set, biggest).getSampleCount(0.0d) == 0.0d)
                 count += set.size();
         return count;
     }

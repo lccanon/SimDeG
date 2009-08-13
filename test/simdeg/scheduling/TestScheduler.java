@@ -1,4 +1,4 @@
-package simdeg.reputation.simulation;
+package simdeg.scheduling;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -22,9 +22,11 @@ public class TestScheduler {
     /* To be ignored if the output has to be analysed */
     @BeforeClass
     public static void desactivateLogger() {
+        /*
         Logger logger1
             = Logger.getLogger(Evaluator.class.getName());
         logger1.setLevel(Level.SEVERE);
+        */
         Logger logger2
             = Logger.getLogger(Scheduler.class.getName());
         logger2.setLevel(Level.SEVERE);
@@ -116,6 +118,7 @@ public class TestScheduler {
         buggingGroups.put(worker5, col);
     }
 
+    /*
     @Test public void scheduler() {
         ReputationSystem reputationSystem = getReputationSystem();
         Evaluator evaluator = new Evaluator(reputationSystem);
@@ -126,7 +129,9 @@ public class TestScheduler {
         Scheduler scheduler = new Scheduler(reputationSystem, evaluator);
         scheduler.addAllWorkers(workersReliability.keySet());
     }
+    */
 
+    /*
     @Test public void removeAllworkers() {
         ReputationSystem reputationSystem = getReputationSystem();
         Evaluator evaluator = new Evaluator(reputationSystem);
@@ -138,7 +143,9 @@ public class TestScheduler {
         scheduler.addAllWorkers(workersReliability.keySet());
         scheduler.removeAllWorkers(workersReliability.keySet());
     }
+    */
 
+    /*
     @Test public void start() {
         ReputationSystem reputationSystem = getReputationSystem();
         Evaluator evaluator = new Evaluator(reputationSystem);
@@ -150,7 +157,9 @@ public class TestScheduler {
         scheduler.addAllWorkers(workersReliability.keySet());
         scheduler.start(100, 3.0d, 0.5d, 0.9d);
     }
+    */
 
+    /*
     @Test(expected=OutOfRangeException.class)
         public void startException() {
         ReputationSystem reputationSystem = getReputationSystem();
@@ -163,5 +172,6 @@ public class TestScheduler {
         scheduler.addAllWorkers(workersReliability.keySet());
         scheduler.start(100, 3.0d, 1.01d, 0.9d);
     }
+    */
 
 }

@@ -3,6 +3,9 @@ package simdeg.util;
 import static simdeg.util.InverseMath.inverseIncompleteBeta;
 import static simdeg.util.InverseMath.inverseNormal;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 import java.lang.reflect.Method;
@@ -177,7 +180,7 @@ public class Beta extends RV {
      */
     protected Beta set(double lower, double upper,
             double estimate, double variance) {
-        super.set(lower, upper, estimate, variance);
+        setRange(lower, upper);
 
         /* Optimization */
         if (estimate == getMean() && variance == getVariance())
@@ -210,13 +213,29 @@ public class Beta extends RV {
         return this;
     }
 
+    /**
+     * Override RV.opposite for performance reason.
+     */
+    protected Beta opposite() {
+        setRange(-this.upper, -this.lower);
+        final double alpha = this.beta;
+        final double beta = this.alpha;
+        this.alpha = alpha;
+        this.beta = beta;
+        this.bernoulli = 1.0d - this.bernoulli;
+        return this;
+    }
+
+    protected Beta setRange(double lower, double upper) {
+        super.set(lower, upper, 0.0d, 0.0d);
+        return this;
+    }
+
     public String toString() {
-        java.text.DecimalFormat df = new java.text.DecimalFormat("0.##",
-                new java.text.DecimalFormatSymbols(java.util.Locale.ENGLISH));
-        return "{" + df.format(getMean()) + ","
-            + df.format(getError()) + "}/(" + df.format(alpha) + ","
-            + df.format(beta) + ","
-            + df.format(getLowerEndpoint()) + ","
+        DecimalFormat df = new DecimalFormat("0.##",
+                new DecimalFormatSymbols(Locale.ENGLISH));
+        return super.toString() + "/(" + df.format(alpha) + ","
+            + df.format(beta) + "," + df.format(getLowerEndpoint()) + ","
             + df.format(getUpperEndpoint()) + ")";
     }
 

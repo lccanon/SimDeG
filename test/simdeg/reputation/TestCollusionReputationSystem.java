@@ -33,6 +33,8 @@ import org.junit.Test;
  * A test with 3 overlapping sets with random and proba 0.5.
  * A test with the 6 overlapping sets without random.
  * A test with the 6 overlapping sets with random.
+ * A test where workers merge except one that is left alone.
+ * A test with unreliable certification process.
  * For each test, the certified result depends on the biggest or not.
  * Each set should make sure that: merges operations is limited (more than the
  * minimum but less than no pairwise merge + number of splits); split
@@ -57,8 +59,10 @@ public class TestCollusionReputationSystem {
             for (int j=0; j < (i==0?25:15); j++) {
                 final int hash = j * 6 + i;
                 final int group = i;
-                workersList.get(i).add(new Worker() {public int hashCode() {
-                        return hash; }public String toString(){return group+"";}});
+                workersList.get(i).add(new Worker() {
+                        public int hashCode() { return hash; }
+                        public String toString() { return group+""; }
+                        });
             }
         }
         workers = new HashSet<Worker>();

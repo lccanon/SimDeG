@@ -35,14 +35,18 @@ public class TestAgreementMatrix {
         workers1 = new HashSet<Worker>();
         for (int i=0; i<10; i++) {
             final int hash = i * 2;
-            workers1.add(new Worker() {public int hashCode() {
-                    return hash; }/*public String toString(){return "1";}*/});
+            workers1.add(new Worker() {
+                    public int hashCode() { return hash; }
+                    public String toString() { return "1"; }
+                    });
         }
         workers2 = new HashSet<Worker>();
         for (int i=0; i<29; i++) {
             final int hash = i * 2 + 1;
-            workers2.add(new Worker() {public int hashCode() {
-                    return hash; }/*public String toString(){return "2";}*/});
+            workers2.add(new Worker() {
+                    public int hashCode() { return hash; }
+                    public String toString() { return "2"; }
+                    });
         }
         workers = new HashSet<Worker>();
         workers.addAll(workers1);

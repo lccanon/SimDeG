@@ -51,8 +51,6 @@ public class AgreementReputationSystem extends SkeletonReputationSystem {
 	 */
 	protected void setAgreement(Job job, Worker worker, Set<Worker> workers) {
 		assert (!workers.isEmpty()) : "Not enough workers in group";
-        if (!updatedSets.containsKey(job))
-            updatedSets.put(job, new HashMap<Set<Worker>, Set<Set<Worker>>>());
         for (Worker otherWorker : workers) {
             final Set<Worker> setWorker = agreement.getSet(worker);
             final Set<Worker> setOtherWorker = agreement.getSet(otherWorker);
@@ -70,8 +68,6 @@ public class AgreementReputationSystem extends SkeletonReputationSystem {
 	 */
 	protected void setDisagreement(Job job, Worker worker, Set<Worker> workers) {
 		assert (workers.size() > 1) : "Not enough workers in group";
-        if (!updatedSets.containsKey(job))
-            updatedSets.put(job, new HashMap<Set<Worker>, Set<Set<Worker>>>());
         for (Worker otherWorker : workers) {
             final Set<Worker> setWorker = agreement.getSet(worker);
             final Set<Worker> setOtherWorker = agreement.getSet(otherWorker);
@@ -86,12 +82,11 @@ public class AgreementReputationSystem extends SkeletonReputationSystem {
 
 	/**
 	 * Specifies the winning group among all these groups of workers giving
-	 * distinct results. Workers does not contain the winning set.
+     * distinct results. Workers does not contain the winning set. Useless in
+     * this class.
 	 */
 	protected void setDistinctSets(Job job, Set<Worker> winningWorkers,
 			Set<Set<Worker>> workers) {
-        assert (!winningWorkers.isEmpty()) : "No winning workers";
-		updatedSets.remove(job);
 	}
 
 	/**
@@ -154,11 +149,8 @@ public class AgreementReputationSystem extends SkeletonReputationSystem {
 	}
 
     public String toString() {
-        return "agreement-based reputation system";
-    }
-
-    protected void print() {
-        agreement.print();
+        return super.toString() + "Agreement-based reputation system:\n"
+            + agreement.toString();
     }
 
 }

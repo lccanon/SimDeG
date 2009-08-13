@@ -104,7 +104,7 @@ public abstract class RV {
         return rv1.clone().multiply(d);
     }
 
-    private RV opposite() {
+    protected RV opposite() {
         return this.multiply(-1.0d);
     }
 
@@ -200,8 +200,7 @@ public abstract class RV {
     public String toString() {
         DecimalFormat df = new DecimalFormat("0.##",
                 new DecimalFormatSymbols(Locale.ENGLISH));
-        return "{" + df.format(getMean()) + ","
-            + df.format(getError()) + "}";
+        return "{" + df.format(getMean()) + "," + df.format(getError()) + "}";
     }
 
 }

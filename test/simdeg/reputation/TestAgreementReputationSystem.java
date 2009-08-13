@@ -33,6 +33,7 @@ import org.junit.Test;
  * A test with 3 overlapping sets with random and proba 0.5.
  * A test with the 6 overlapping sets without random.
  * A test with the 6 overlapping sets with random.
+ * A test where 2 workers are merge wrongly and one interacts with other colluders.
  * Each set should make sure that: merges operations is limited (more than the
  * minimum but less than no pairwise merge + number of splits); split
  * operations is limited (only a few); lot of operations in first iterations;
@@ -54,9 +55,11 @@ public class TestAgreementReputationSystem {
             workersList.add(new HashSet<Worker>());
             for (int j=0; j < (i==0?25:15); j++) {
                 final int hash = j * 6 + i;
-                //final int group = i;
-                workersList.get(i).add(new Worker() {public int hashCode() {
-                        return hash; }/*public String toString(){return group+"";}*/});
+                final int group = i;
+                workersList.get(i).add(new Worker() {
+                        public int hashCode() { return hash; }
+                        public String toString() { return group+""; }
+                        });
             }
         }
         workers = new HashSet<Worker>();
