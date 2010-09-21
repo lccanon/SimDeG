@@ -4,13 +4,17 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Scanner;
 import java.util.Locale;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.LogManager;
 import java.util.NoSuchElementException;
+import java.util.Properties;
+import java.lang.reflect.Field;
 
 import simdeg.reputation.ReputationSystem;
 import simdeg.util.OutOfRangeException;
@@ -29,17 +33,16 @@ class Simulator {
     enum CertificationMethod {PERFECT, BEST, MAJORITY};
 
     /** Logger */
-    private static final Logger logger
-        = Logger.getLogger(Simulator.class.getName());
+    private static Logger logger;
 
-    /** This class should not be instanciated */
+    /** This class should not be instantiated */
     protected Simulator() {
     }
 
 
     /* Configuration parsing part */
 
-    private static ReputationSystem reputationSystem = null;
+    private static ReputationSystem<Worker> reputationSystem = null;
     private static CertificationMethod certificationMethod = null;
 
     private static String fileTrace = null;
@@ -47,7 +50,7 @@ class Simulator {
 
     /* TODO add parameters of the reputation system
      * - multiplier for hardening merges
-     * - multiplier for collusion
+     * - multiplier for collusion (readaptation)
      */
     private static enum Parameter {
         ReputationSystemComponent, EstimationLevel,
@@ -56,7 +59,7 @@ class Simulator {
     }
 
     @SuppressWarnings("unchecked")
-    private static void addParameter(String name, String value) {
+	private static void addParameter(String name, String value) {
         switch (Parameter.valueOf(name)) {
             case EstimationLevel:
                 if (Double.valueOf(value) < 0)
@@ -70,7 +73,7 @@ class Simulator {
                 case ReputationSystemComponent:
                     try {
                         String gridCharacteristicsStr = "simdeg.reputation." + value;
-                        reputationSystem = (ReputationSystem)Class.forName
+                        reputationSystem = (ReputationSystem<Worker>)Class.forName
                             (gridCharacteristicsStr).newInstance();
                     } catch (ClassNotFoundException e) {
                         logger.log(Level.SEVERE, "Reputation system " + name
@@ -102,17 +105,27 @@ class Simulator {
     private static void parseConfiguration(String fileName) {
         try {
             File file = new File(fileName);
+            logger.config("Reading configuration file " + fileName);
             Scanner scanner = new Scanner(file);
             int i=0;
             while (scanner.hasNextLine()) {
                 String nextLine = scanner.nextLine();
-                if (nextLine.equals("") || nextLine.charAt(0) == '#')
+                if (nextLine.equals(""))
                     continue;
                 Scanner scannerComment = new Scanner(nextLine);
                 scannerComment.useDelimiter("#");
+                if (nextLine.charAt(0) == '#') {
+                    if (scannerComment.hasNext())
+                        logger.config("Read comment: " + scannerComment.next());
+                    scannerComment.close();
+                    continue;
+                }
                 Scanner scannerLine = new Scanner(scannerComment.next());
+                if (scannerComment.hasNext())
+                    logger.config("Read comment: " + scannerComment.next());
+                scannerComment.close();
                 scannerLine.useDelimiter(" = ");
-                if (scannerLine.hasNext()){
+                if (scannerLine.hasNext()) {
                     String name = scannerLine.next();
                     String value = scannerLine.next();
                     addParameter(name, value);
@@ -135,7 +148,8 @@ class Simulator {
     /**
      * Tries to get the best result for the given job.
      */
-    private static Result getCertifiedResult(Job job, Map<Job, List<Result>> resultingResults) {
+    private static Result getCertifiedResult(Job job, Map<Job,
+            List<Result>> resultingResults) {
         if (!resultingResults.containsKey(job))
             throw new NoSuchElementException("Job not yet computed by any worker");
 
@@ -174,10 +188,29 @@ class Simulator {
     public static void main(String[] args) {
 
         /* Parse parameters from the configuration file */
-        if(args.length < 1) {
-            logger.severe("Usage : java simulator.simulator configuration_file");
+        if (args.length < 2) {
+            System.err.println("Usage: java simulator.simulator configuration_file output_file");
             System.exit(1);
         }
+
+        /* Specify the output file containing the logs */
+        final Field fields[] = LogManager.class.getDeclaredFields();
+        for (Field field : fields)
+            if (field.getName().equals("props")) {
+                try {
+                field.setAccessible(true);
+                ((Properties)field.get(LogManager.getLogManager()))
+                    .setProperty("java.util.logging.FileHandler.pattern", args[1]);
+                } catch (IllegalAccessException e) {
+                    System.err.println("Useless " + e);
+                    System.exit(1);
+                }
+            }
+        logger = Logger.getLogger(Simulator.class.getName());
+
+        logger.config("Used with commands: " + Arrays.toString(args));
+
+        /* Parse main parameters */
         parseConfiguration(args[0]);
 
         /* Initialize the evaluation of the reputation system */
@@ -206,16 +239,16 @@ class Simulator {
          * them jobs */
         logger.info("Start the traces");
         while (scanner.hasNextLine()) {
-            final long timestamp = scanner.nextLong();
+            final double timestamp = scanner.nextDouble();
             final long id = scanner.nextLong();
             Scanner scannerLine = new Scanner(scanner.nextLine());
             if (scannerLine.hasNext()) {
-                scannerLine.reset();
                 /* Get a triple */
                 final Worker worker = new Worker(id);
                 final Job job = new Job(scannerLine.nextLong());
                 final Result result = new Result(scannerLine.nextLong());
-                logger.fine("Read " + timestamp + " " + worker + " " + job + " " + result);
+                logger.finer("Read " + timestamp + " " + worker + " " + job
+                        + " " + result);
 
                 /* Inform the reputation system */
                 reputationSystem.setWorkerResult(worker, job, result);
@@ -224,7 +257,7 @@ class Simulator {
                 resultingResults.get(job).add(result);
             } else {
                 final Job job = new Job(id);
-                logger.fine("Read " + timestamp + " " + job);
+                logger.finer("Read " + timestamp + " " + job);
 
                 /* In the case every worker has finished a job */
                 final Result result = getCertifiedResult(job,

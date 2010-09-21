@@ -1,20 +1,11 @@
 package simdeg.util;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.lang.reflect.Method;
+import static java.lang.Math.abs;
 import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
-import static java.lang.Math.abs;
-import java.lang.Double;
-
 import flanagan.analysis.Stat;
 
 public class EMA extends RV {
-
-    /** Logger */
-    private static final Logger logger
-        = Logger.getLogger(EMA.class.getName());
 
     /**
      * Weight of the exponential short term moving average in order to have
@@ -42,24 +33,24 @@ public class EMA extends RV {
     /** Default long term estimator standard deviation */
     private static final double LONG_TERM_STD_DEV = 0.03d;
 
-    private static final double LUT_PRECISION = 0.01d;
+//    private static final double LUT_PRECISION = 0.01d;
 
-    private static UnaryLUT<Double,Double> estimatorsConsistencyValues;
+//    private static UnaryLUT<Double,Double> estimatorsConsistencyValues;
 
-    static {
-        try {
-            Method estimatorsConsistencyMethod
-                = EMA.class.getMethod(
-                        "getEstimatorsConsistency", Double.TYPE);
-            estimatorsConsistencyValues = new UnaryLUT<Double,Double>(
-                    estimatorsConsistencyMethod,
-                    new Double[] {0.0d, 1.0d, LUT_PRECISION});
-        } catch (NoSuchMethodException e) {
-            logger.log(Level.SEVERE,
-                    "The method getEstimatorsConsistency was not found", e);
-            System.exit(1);
-        }
-    }
+//    static {
+//        try {
+//            Method estimatorsConsistencyMethod
+//                = EMA.class.getMethod(
+//                        "getEstimatorsConsistency", Double.TYPE);
+//            estimatorsConsistencyValues = new UnaryLUT<Double,Double>(
+//                    estimatorsConsistencyMethod,
+//                    new Double[] {0.0d, 1.0d, LUT_PRECISION});
+//        } catch (NoSuchMethodException e) {
+//            logger.log(Level.SEVERE,
+//                    "The method getEstimatorsConsistency was not found", e);
+//            System.exit(1);
+//        }
+//    }
 
     public EMA() {
         this(SHORT_TERM_STD_DEV, LONG_TERM_STD_DEV);
@@ -99,9 +90,9 @@ public class EMA extends RV {
                 longTermWeight);
     }
 
-    private double getEstimatorsConsistency(double e1, double e2) {
-        return estimatorsConsistencyValues.getValue(abs(e1 - e2));
-    }
+//    private double getEstimatorsConsistency(double e1, double e2) {
+//        return estimatorsConsistencyValues.getValue(abs(e1 - e2));
+//    }
 
     public EMA clone() {
         return new EMA(shortTermEstimate, longTermEstimate,
@@ -136,9 +127,9 @@ public class EMA extends RV {
         //return getEstimatorsConsistency(shortTermEstimate, longTermEstimate);
     }
 
-    private double getError(double level) {
-        return getError();
-    }
+//    private double getError(double level) {
+//        return getError();
+//    }
 
     public double getVariance() {
         return 0.0d;

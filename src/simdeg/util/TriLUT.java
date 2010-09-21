@@ -6,8 +6,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Class creating Look-Up Table objets containing previously computed
- * results. For trinary functions. Does not work with short, byte and atomic
+ * Class creating Look-Up Table objects containing previously computed
+ * results. For ternary functions. Does not work with short, byte and atomic
  * types. Also possible to achieve the same result with two unary LUT since,
  * for now, there is no interpolation.
  */

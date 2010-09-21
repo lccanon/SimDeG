@@ -1,14 +1,13 @@
 package simdeg.util;
 
-import java.util.Arrays;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-import org.junit.Test;
 import org.junit.BeforeClass;
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class TestRV {
 
-    private final static double LARGE_EPSILON = 1E-1d;
     private final static double BIG_EPSILON = 1E-2d;
     private final static double EPSILON = 1E-5d;
     private final static double EXTREMA_THRESHOLD = 0.3d;
@@ -56,7 +55,6 @@ public class TestRV {
 
     @Test public void truncateRange4() {
         RV rv = rv3.clone().subtract(rv1);
-        final double error = rv.getError();
         rv.truncateRange(0.0d, 1.0d);
         assertEquals(0.0d, rv.getMean(), EPSILON);
     }

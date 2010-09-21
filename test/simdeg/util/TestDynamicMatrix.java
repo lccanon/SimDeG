@@ -1,14 +1,17 @@
 package simdeg.util;
 
-import java.util.Set;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.NoSuchElementException;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
-import org.junit.Test;
+import java.util.HashSet;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
 import org.junit.Before;
 import org.junit.BeforeClass;
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class TestDynamicMatrix {
 
@@ -127,22 +130,22 @@ public class TestDynamicMatrix {
     }
 
     @Test public void getBiggest() {
-        assertTrue(matrix.getBiggest().isEmpty());
+        assertTrue(matrix.getLargest().isEmpty());
         matrix.addAll(objects1);
-        assertFalse(matrix.getBiggest().isEmpty());
+        assertFalse(matrix.getLargest().isEmpty());
         /* Force an update of the biggest */
         matrix.addAll(objects2);
         matrix.removeAll(objects1);
-        assertFalse(matrix.getBiggest().isEmpty());
+        assertFalse(matrix.getLargest().isEmpty());
         /* Remove all objects */
         matrix.removeAll(objects2);
-        assertTrue(matrix.getBiggest().isEmpty());
+        assertTrue(matrix.getLargest().isEmpty());
         /* Perform merges of all objects from first set */
         matrix.addAll(objects);
         final Object object1 = objects1.iterator().next();
         for (Object object : objects1)
             matrix.merge(matrix.getSet(object1), matrix.getSet(object));
-        assertEquals(objects1.size(), matrix.getBiggest().size());
+        assertEquals(objects1.size(), matrix.getLargest().size());
     }
 
     @Test public void merge() {
@@ -152,7 +155,7 @@ public class TestDynamicMatrix {
         for (Object object : objects1) {
             matrix.merge(matrix.getSet(object1), matrix.getSet(object));
             if (object != object1)
-                assertSame(matrix.getSet(object1), matrix.getBiggest());
+                assertSame(matrix.getSet(object1), matrix.getLargest());
             assertEquals(matrix.getSets(objects).size(),
                     objects.size() - matrix.getSet(object1).size() + 1);
         }
@@ -175,13 +178,13 @@ public class TestDynamicMatrix {
             matrix.merge(matrix.getSet(object1), matrix.getSet(object));
         for (Object object : objects2) {
             matrix.split(matrix.getSet(object1), object);
-            assertSame(matrix.getSet(object1), matrix.getBiggest());
+            assertSame(matrix.getSet(object1), matrix.getLargest());
             assertEquals(matrix.getSets(objects).size(),
                     objects.size() - matrix.getSet(object1).size() + 1);
         }
         /* Remove part of the objects */
         matrix.removeAll(objects1);
-        assertEquals(1, matrix.getBiggest().size());
+        assertEquals(1, matrix.getLargest().size());
     }
 
 }

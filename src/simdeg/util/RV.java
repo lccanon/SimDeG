@@ -6,7 +6,7 @@ import java.text.DecimalFormatSymbols;
 
 import flanagan.analysis.Stat;
 
-public abstract class RV {
+public abstract class RV extends HashableObject {
 
     /**
      * Default confidence level concerning the computation of the committed
@@ -41,7 +41,7 @@ public abstract class RV {
     /**
      * Gives the variance of the rv, based on the number of measures.
      */
-    protected abstract double getVariance();
+    public abstract double getVariance();
 
     /**
      * Gives the estimation of the error on the measured value with the default
@@ -135,13 +135,21 @@ public abstract class RV {
     }
 
     public RV min(RV rv) {
+    	return min(rv, 0.0d);
+    }
+    
+    public RV min(RV rv, double correlation) {
         if (rv == this)
-            return opposite().max(rv).opposite();
-        return opposite().max(opposite(rv)).opposite();
+            return opposite().max(rv, correlation).opposite();
+        return opposite().max(opposite(rv), correlation).opposite();
     }
 
     public static RV min(RV rv1, RV rv2) {
-        return rv1.clone().min(rv2);
+        return min(rv1, rv2, 0.0d);
+    }
+    
+    public static RV min(RV rv1, RV rv2, double correlation) {
+        return rv1.clone().min(rv2, correlation);
     }
 
     /**
@@ -149,13 +157,19 @@ public abstract class RV {
      * through Clark's moment approach.
      */
     public RV max(RV rv) {
+    	return max(rv, 0.0d);
+	}
+
+    public RV max(RV rv, double correlation) {
         final double mean1 = getMean();
         final double mean2 = rv.getMean();
-        final double var1 = getVariance();
-        final double var2 = rv.getVariance();
-        final double a = Math.sqrt(var1 + var2);
-        final double alpha = (mean1 - mean2) / a;
-        final double estimate = mean1 * Phi(alpha) + mean2 * Phi(-alpha)
+		final double var1 = getVariance();
+		final double var2 = rv.getVariance();
+		final double a = correlation == 0.0d ? Math.sqrt(var1 + var2) : Math
+				.sqrt(var1 + var2 - correlation * Math.sqrt(var1)
+						* Math.sqrt(var2));
+		final double alpha = (mean1 - mean2) / a;
+		final double estimate = mean1 * Phi(alpha) + mean2 * Phi(-alpha)
             + a * varphi(alpha);
         final double variance = (mean1 * mean1 + var1) * Phi(alpha)
             + (mean2 * mean2 + var2) * Phi(-alpha)
@@ -166,7 +180,11 @@ public abstract class RV {
     }
 
     public static RV max(RV rv1, RV rv2) {
-        return rv1.clone().max(rv2);
+        return max(rv1, rv2, 0.0d);
+    }
+    
+    public static RV max(RV rv1, RV rv2, double correlation) {
+        return rv1.clone().max(rv2, correlation);
     }
 
 
@@ -195,12 +213,12 @@ public abstract class RV {
     }
 
 
-    /* Utilitary function */
+    /* Utility function */
 
     public String toString() {
         DecimalFormat df = new DecimalFormat("0.##",
                 new DecimalFormatSymbols(Locale.ENGLISH));
-        return "{" + df.format(getMean()) + "," + df.format(getError()) + "}";
+        return "{" + df.format(getMean()) + "," + df.format(Math.sqrt(getVariance())) + "}";
     }
 
 }

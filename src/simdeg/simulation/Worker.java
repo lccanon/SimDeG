@@ -1,358 +1,227 @@
 package simdeg.simulation;
 
-import static simdeg.simulation.Result.ResultType.*;
-
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Set;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Logger;
 
+import simdeg.util.HashableObject;
 import simdeg.util.RandomManager;
-import simdeg.util.Switcher;
-import simdeg.util.OutOfRangeException;
-
-import simgrid.msg.Msg;
-import simgrid.msg.Host;
-import simgrid.msg.Task;
-import simgrid.msg.JniException;
-import simgrid.msg.NativeException;
 
 /**
- * Workers are agents that treat more or less successfully the Jobs they are
- * assigned to.
- * They are characterized by their probability of failure and their collusion
- * behavior.
+ * Workers are agents that treat more or less successfully the jobs they are
+ * assigned to. They are characterized by their probability of failure and their
+ * collusion behaviors.
  */
-class Worker extends simgrid.msg.Process implements simdeg.reputation.Worker {
+class Worker extends HashableObject implements simdeg.reputation.Worker {
 
-    /** Failure-related variable */
-    private Switcher<Double> reliability = null;
+	/** Logger */
+	private static final Logger logger = Logger.getLogger(Worker.class
+			.getName());
 
-    /** Bugging collusion behavior */
-    private Switcher<Set<CollusionGroup>> buggingGroups = null;
+	/** Speed of the worker in floating operations per second (immutable) */
+	private double fops;
 
-    /** Attacking collusion behavior */
-    private Switcher<CollusionGroup> attackingGroup = null;
+	/** Probability not to return a failed result (immutable) */
+	private double reliability = 1.0d;
 
+	/** Group of collusion to which belong the worker (null if none) (immutable) */
+	private CollusionGroup collusionGroup;
 
-    /** History of the Worker */
-    private Set<Job> previousJobs = new HashSet<Job>();
+	/** Job that the current worker is processing (null if none) */
+	private Job currentJob;
 
-    /** Current status of the Worker */
-    private Job currentJob = null;
+	/** Remaining floating operations to be performed for the current job */
+	private double remainingFops;
 
-    /** For idle time measure (temp) */
-    private double previousTime = 0.0d;
+	/** Event that indicates the end of the computation of the current job */
+	private ProcessCompletionEvent processCompletion;
 
-    /** For idle time measure (total) */
-    private double idleTime = 0.0d;
+	/** Event that indicates the timeout for the current job */
+	private ProcessTimeoutEvent processTimeout;
 
+	/**
+	 * Precedent availability of unavailability event (null means it has never
+	 * be available).
+	 */
+	private Event previousAvailabilityEvent;
 
-    /** Guarantees the reliability probability */
-    private double shortTermFail;
+	/**
+	 * Specifies the speed of the worker (called only once).
+	 */
+	protected void setFOPS(double fops) {
+		this.fops = fops;
+	}
 
-    /** An estimator of the probability to be used */
-    private double shortTermFailProba;
+	protected double getReliability() {
+		return reliability;
+	}
 
-    /** Guarantees the bugging behavior */
-    private Map<CollusionGroup,Double> shortTermBugs
-        = new HashMap<CollusionGroup,Double>();
+	/**
+	 * Specifies the reliability of the worker (called only once).
+	 */
+	protected void setReliability(double reliability) {
+		this.reliability = reliability;
+	}
 
-    /** An estimator of the probability to be used */
-    private Map<CollusionGroup,Double> shortTermBugsProba
-        = new HashMap<CollusionGroup,Double>();
+	protected CollusionGroup getCollusionGroup() {
+		return collusionGroup;
+	}
 
-    private static final double SHORT_TERM_STD_DEV = 0.1d;
+	/**
+	 * Specifies the group of collusion of the worker (called only once).
+	 */
+	protected void setCollusionGroup(CollusionGroup collusionGroup) {
+		this.collusionGroup = collusionGroup;
+	}
 
-    private static final double SHORT_TERM_WEIGHT
-        = 8.0d * Math.pow(SHORT_TERM_STD_DEV, 2.0d)
-        / (4.0d * Math.pow(SHORT_TERM_STD_DEV, 2.0d) + 1.0d);
+	/**
+	 * Assigns a job to the current worker.
+	 */
+	protected void assignJob(Job job) {
+		currentJob = job;
+		if (job != null)
+			remainingFops = job.getFOPS();
+		processCompletion = null;
+		processTimeout = null;
+	}
 
+	/**
+	 * Returns the current processed Job
+	 */
+	protected Job getCurrentJob() {
+		return currentJob;
+	}
 
-    /**
-     * Send ending job to specified workers
-     */
-    static void terminateAllWorkers(Set<? extends Worker> workers)
-            throws JniException, NativeException {
-        for (Worker worker : workers) {
-            Job terminate = new Job(new Result(LAST));
-            worker.taskSend(terminate);
-        }
-        simgrid.msg.Process.waitFor(0.0d);
-    }
+	/**
+	 * Updates the computation that has been done as of the given date.
+	 */
+	protected void updateRemainingTime(double currentDate) {
+		remainingFops = fops * (processCompletion.getDate() - currentDate);
+	}
 
-    Worker(Host host, String name, Switcher<Double> reliability,
-            Switcher<Set<CollusionGroup>> buggingGroups,
-            Switcher<CollusionGroup> attackingGroup)
-                throws JniException, NativeException {
-        super(host, name, null);
-        setName(name);
-        setReliability(reliability);
-        setBuggingGroups(buggingGroups);
-        setAttackingGroup(attackingGroup);
-        previousTime = Msg.getClock();
-        checkProbabilities();
-    }
+	/**
+	 * Returns the remaining time for the current job.
+	 */
+	protected double getRemainingTime() {
+		return remainingFops / fops;
+	}
 
-    private void setReliability(Switcher<Double> reliability) {
-        assert(reliability.get(0.0d) >= 0.0d && reliability.get(0.0d) <= 1.0d)
-            : "Not a proper probability: " + reliability;
-        this.reliability = reliability;
-        shortTermFail = 1.0d - reliability.get(Msg.getClock());
-        shortTermFailProba = 1.0d - reliability.get(Msg.getClock());
-    }
+	/**
+	 * Sets the completion time separately of the job assignment because the
+	 * completion changes if the worker becomes unavailable.
+	 */
+	protected void setNextProcessCompletionEvent(
+			ProcessCompletionEvent processCompletion) {
+		this.processCompletion = processCompletion;
+	}
 
-    private void setBuggingGroups(Switcher<Set<CollusionGroup>> buggingGroups) {
-        this.buggingGroups = buggingGroups;
-        for (Set<CollusionGroup> set : buggingGroups.getAll())
-            for (CollusionGroup buggingGroup : set) {
-                buggingGroup.addWorker(this);
-                shortTermBugs.put(buggingGroup,
-                        buggingGroup.getProbability());
-                shortTermBugsProba.put(buggingGroup,
-                        buggingGroup.getProbability());
-        }
-    }
+	/**
+	 * This event must be removed when the worker becomes unavailable.
+	 */
+	protected ProcessCompletionEvent getNextProcessCompletionEvent() {
+		return processCompletion;
+	}
 
-    private void setAttackingGroup(Switcher<CollusionGroup> attackingGroup) {
-        this.attackingGroup = attackingGroup;
-        for (CollusionGroup attacking : attackingGroup.getAll())
-            if (attacking != null)
-                attacking.addWorker(this);
-    }
+	protected void setNextProcessTimeoutEvent(ProcessTimeoutEvent processTimeout) {
+		this.processTimeout = processTimeout;
+	}
 
+	/**
+	 * This event must be removed when the worker finish its assigned jobs.
+	 */
+	protected ProcessTimeoutEvent getNextProcessTimeoutEvent() {
+		return processTimeout;
+	}
 
-    double getIdleTime() {
-        return this.idleTime;
-    }
+	/**
+	 * Sets the last available of unavailable event.
+	 */
+	protected void setPreviousAvailabilityEvent(Event event) {
+		this.previousAvailabilityEvent = event;
+	}
 
-    /**
-     * Return the previous Result given for a Job
-     */
-    Result getPreviousResult(Job job) {
-        if (previousJobs.contains(job))
-            for (Job previousJob : previousJobs)
-                if (previousJob.equals(job))
-                    return previousJob.getResult();
-        return null;
-    }
+	protected Event getPreviousAvailabilityEvent() {
+		return previousAvailabilityEvent;
+	}
 
-    /**
-     * Return the current processing Job
-     */
-    Job getCurrentJob() {
-        return currentJob;
-    }
+	/**
+	 * Gets the result for the given job (takes into account the reliability and
+	 * the groups of collusion).
+	 */
+	protected Result getResult(Job job) {
+		if (RandomManager.getRandom("reliability").nextDouble() > reliability) {
+			logger.fine("Worker " + this + " fails for job " + job);
+			return Result.getFailedResult();
+		}
 
-    public String toString() {
-        return getName();
-    }
+		if (collusionGroup != null && collusionGroup.getResult(job) != null)
+			return collusionGroup.getResult(job);
 
-    /**
-     * Checks internaly if the specified probabilities are achievables.
-     */
-    private void checkProbabilities() {
-        double probabilityTotal = 1.0d - reliability.get(Msg.getClock());
-        if (attackingGroup.get(Msg.getClock()) != null)
-            probabilityTotal
-                += attackingGroup.get(Msg.getClock()).getProbability();
-        double maxProbaCollusion = 0.0d;
-        for (CollusionGroup buggingGroup : buggingGroups.get(Msg.getClock()))
-            maxProbaCollusion = Math.max(maxProbaCollusion,
-                    buggingGroup.getProbability());
-        probabilityTotal += maxProbaCollusion;
-        if (probabilityTotal < 0.0d || probabilityTotal > 1.0d)
-            throw new OutOfRangeException(probabilityTotal, 0.0d, 1.0d);
-    }
+		return Result.getCorrectResult();
+	}
 
-    /**
-     * Decides to attack or not.
-     */
-    private boolean isAttacking(Job job) throws Exception {
+	public String toString() {
+		return "(" + hashCode() + ", " + fops + ", " + reliability + ")";
+	}
 
-        CollusionGroup attacking = attackingGroup.get(Msg.getClock());
+	public static void main(String[] args) {
+		/* Workers creation */
+		Worker[] workers = new Worker[8];
+		for (int i = 0; i < workers.length; i++)
+			workers[i] = new Worker();
+		/* CollusionGroup creation */
+		CollusionGroup collusionGroup1 = new CollusionGroup(0.45d);
+		collusionGroup1.add(workers[0]);
+		collusionGroup1.add(workers[1]);
+		CollusionGroup collusionGroup2 = new CollusionGroup(0.15d);
+		collusionGroup2.add(workers[2]);
+		collusionGroup2.add(workers[3]);
+		CollusionGroup collusionGroup3 = new CollusionGroup(0.24d);
+		collusionGroup3.add(workers[4]);
+		collusionGroup3.add(workers[5]);
+		CollusionGroup collusionGroup4 = new CollusionGroup(0.2d);
+		collusionGroup4.add(workers[6]);
+		collusionGroup4.add(workers[7]);
+		/* InterCollusionGroup creation */
+		InterCollusionGroup interCollusionGroup1 = new InterCollusionGroup(0.1d);
+		interCollusionGroup1.add(collusionGroup1);
+		interCollusionGroup1.add(collusionGroup2);
+		InterCollusionGroup interCollusionGroup2 = new InterCollusionGroup(0.2d);
+		interCollusionGroup2.add(collusionGroup3);
+		interCollusionGroup2.add(collusionGroup4);
+		InterCollusionGroup interCollusionGroup3 = new InterCollusionGroup(0.4d);
+		interCollusionGroup3.add(collusionGroup2);
+		interCollusionGroup3.add(collusionGroup3);
+		/* Decision tree creation */
+		Set<InterCollusionGroup> interCollusionGroups = new HashSet<InterCollusionGroup>();
+		interCollusionGroups.add(interCollusionGroup1);
+		interCollusionGroups.add(interCollusionGroup2);
+		interCollusionGroups.add(interCollusionGroup3);
+		new InterCollusionDecisionTree(interCollusionGroups);
 
-        /* Optimization for non-attackers */
-        if (attacking == null)
-            return false;
-
-        /* Check if another Worker already gave an anwer */
-        for (Worker worker : attacking.getWorkers()) {
-            /* If worker is different */
-            if (worker == this)
-                continue;
-            /* Get previous result of worker for this job */
-            Result result = worker.getPreviousResult(job);
-            if (result == null || !result.isSyncSuccess())
-                continue;
-            /* It's already decided by a worker in the same bugging group */
-            return result.getColludingGroup().contains(attacking);
-        }
-
-        /* Collusion if we are able to synchronize with at least another */
-        for (Worker worker : attacking.getWorkers())
-            if (job.equals(worker.getCurrentJob()) && worker != this)
-                return attacking.isColluding();
-
-        /* Missing the sync */
-        throw new Exception();
-    }
-
-    /**
-     * Finds if a worker has already decided to bug.
-     */
-    private Set<CollusionGroup> whichBugging(Job job) {
-        Set<CollusionGroup> result = new HashSet<CollusionGroup>();
-
-group:  for (CollusionGroup buggingGroup : buggingGroups.get(Msg.getClock())) {
-            for (Worker worker : buggingGroup.getWorkers()) {
-                /* If worker is different */
-                if (worker == this)
-                    continue;
-                /* Get previous result of worker for this job */
-                Result prevResult = worker.getPreviousResult(job);
-                if (prevResult == null || prevResult.getType() == ATTACK
-                        || prevResult.getType() == FAILED)
-                    continue;
-                /* It's already decided by a worker in the same bugging group */
-                if (prevResult.getColludingGroup().contains(buggingGroup)) {
-                    shortTermBugs.put(buggingGroup,
-                            shortTermBugs.get(buggingGroup)
-                            + SHORT_TERM_WEIGHT);
-                    result.add(buggingGroup);
-                }
-                continue group;
-            }
-            /* Make the decision according to the bugging probability */
-            if (RandomManager.getRandom("").nextDouble()
-                    < shortTermBugsProba.get(buggingGroup)) {
-                shortTermBugs.put(buggingGroup,
-                        shortTermBugs.get(buggingGroup)
-                        + SHORT_TERM_WEIGHT);
-                result.add(buggingGroup);
-            }
-            shortTermBugsProba.put(buggingGroup,
-                    shortTermBugsProba.get(buggingGroup)
-                    * (1.0d - SHORT_TERM_WEIGHT));
-            if (shortTermBugs.get(buggingGroup)
-                    < buggingGroup.getProbability())
-                shortTermBugsProba.put(buggingGroup,
-                        shortTermBugsProba.get(buggingGroup)
-                        + SHORT_TERM_WEIGHT);
-        }
-
-        return result;
-    }
-
-    /**
-     * Decides the result result based on the specified probability.
-     */
-    private Result computeResult(Job job) {
-        logger.finest("Failure (probability, measured, effective): "
-                + (1.0d - reliability.get(Msg.getClock())) + ", "
-                + shortTermFail + ", " + shortTermFailProba
-                + " for worker " + this);
-        for (CollusionGroup buggingGroup : buggingGroups.get(Msg.getClock()))
-            logger.finest("Bugging (probability, measured, effective): "
-                    + buggingGroup.getProbability() + ", "
-                    + shortTermBugs.get(buggingGroup) + ", "
-                    + shortTermBugsProba.get(buggingGroup)
-                    + " for worker " + this);
-
-        /* One new measures */
-        shortTermFail *= (1.0d - SHORT_TERM_WEIGHT);
-        for (CollusionGroup buggingGroup : buggingGroups.get(Msg.getClock()))
-            shortTermBugs.put(buggingGroup,
-                    shortTermBugs.get(buggingGroup)
-                    * (1.0d - SHORT_TERM_WEIGHT));
-
-        /* Attack case */
-        boolean missSync = false;
-        try {
-            if (isAttacking(job))
-                return new Result(ATTACK, attackingGroup.get(Msg.getClock()));
-        } catch (Exception e) {
-            missSync = true;
-        }
-        
-        /* Reliability case */
-        final boolean failure = RandomManager.getRandom("").nextDouble()
-            < shortTermFailProba;
-        if (failure)
-            shortTermFail += SHORT_TERM_WEIGHT;
-        shortTermFailProba *= (1.0d - SHORT_TERM_WEIGHT);
-        if (shortTermFail < 1.0d - reliability.get(Msg.getClock()))
-            shortTermFailProba += SHORT_TERM_WEIGHT;
-        if (failure)
-            return new Result(FAILED, missSync);
-
-        /* Buggy case */
-        Set<CollusionGroup> groupsBugging = whichBugging(job);
-        if (!groupsBugging.isEmpty())
-            return new Result(BUG, groupsBugging, missSync);
-
-        return new Result(CORRECT, missSync);
-    }
-
-    public void main(String[] args) throws JniException, NativeException {
-
-        logger.config("Worker " + this + " is starting");
-
-        while (true) {
-
-            /* Get a job to compute */
-            logger.fine("Worker " + this + " is waiting");
-            Job job = (Job)Task.receive();
-            logger.fine("Worker " + this + " has finished waiting");
-
-            /* Update idle time spend to wait for a job */
-            idleTime += Msg.getClock() - previousTime;
-
-            /* If it is the last, it quits */
-            if (job.getResult() != null && job.getResult().isLast())
-                break;
-
-            /* Execution for the correct amount of time */
-            currentJob = job;
-            job.execute();
-
-            synchronized(job.getServer()) {
-                /* Set the asnwer to the appropriate flag */
-                job.setResult(computeResult(job));
-
-                /* Store the job in previous job for collusion purpose */
-                previousJobs.add(job);
-                currentJob = null;
-            }
-
-            /* Update the date at which the previous job was finished */
-            previousTime = Msg.getClock();
-
-            /* Send back the finished job */
-            job.getServer().taskSend(job);
-
-            logger.fine("Worker " + this + " has computed job "
-                + job + " and found result " + job.getResult()
-                + " at time " + Msg.getClock());
-
-        }
-
-        logger.config("Worker " + this + " has finished");
-
-    }
-
-    private static int count = 0;
-    private final int hash = count++;
-    /**
-     * Used for HashSet.
-     */
-    public final int hashCode() {
-        return hash;
-    }
-
-    /** Logger */
-    private static final Logger logger
-        = Logger.getLogger(Worker.class.getName());
+		/* Do some Monte Carlo simulations */
+		int countNoneInterColluding = 0;
+		int countAllIntraColluding = 0;
+		final double MC = 1E6;
+		for (int i = 0; i < MC; i++) {
+			Job job = new Job(0.0d);
+			if (interCollusionGroup1.getResult(job) == null
+					&& interCollusionGroup2.getResult(job) == null
+					&& interCollusionGroup3.getResult(job) == null)
+				countNoneInterColluding++;
+			if (collusionGroup1.getResult(job) == Result
+					.getColludedResult(collusionGroup1)
+					&& collusionGroup2.getResult(job) == Result
+							.getColludedResult(collusionGroup2)
+					&& collusionGroup3.getResult(job) == Result
+							.getColludedResult(collusionGroup3)
+					&& collusionGroup4.getResult(job) == Result
+							.getColludedResult(collusionGroup4))
+				countAllIntraColluding++;
+		}
+		/* It should be around 32% and 0.72% */
+		System.out.println((countNoneInterColluding / MC) + " "
+				+ (countAllIntraColluding / MC));
+	}
 
 }

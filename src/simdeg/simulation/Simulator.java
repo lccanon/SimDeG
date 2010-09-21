@@ -2,636 +2,635 @@ package simdeg.simulation;
 
 import static simdeg.util.Collections.getRandomSubGroup;
 import static simdeg.util.Collections.parseList;
+import static simdeg.util.Collections.parseListOfList;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.logging.Level;
+import java.util.TreeSet;
 import java.util.logging.Logger;
 
 import simdeg.reputation.ReputationSystem;
-import simdeg.scheduling.ResourcesGrouper;
 import simdeg.scheduling.ResultCertificator;
 import simdeg.scheduling.Scheduler;
+import simdeg.scheduling.SchedulerListener;
+import simdeg.scheduling.VotingPool;
+import simdeg.util.OutOfRangeException;
 import simdeg.util.RandomManager;
-import simdeg.util.Switcher;
-import simgrid.msg.Host;
-import simgrid.msg.JniException;
-import simgrid.msg.Msg;
-import simgrid.msg.NativeException;
 
 /**
- * The Simulator is the supervisor of the simulated system. It generates and
- * has complete knowledge over all Worker and Job.
+ * The Simulator is the supervisor of the simulated system. It generates and has
+ * complete knowledge over all workers and jobs. Basically, it reads several
+ * input files for specifying the speed of the workers, their availabilities and
+ * the cost of the jobs. When the platform is created (speed of the workers and
+ * fault models), a new job is submitted to the scheduler whenever it needs one,
+ * until there is no more available job. In the same time, the availability
+ * trace file is read and events are created to specify the starting and the
+ * ending time at which a worker becomes available and then unavailable for
+ * computation. When a worker pull a job from the scheduler, two other kinds of
+ * events are created: a timeout event for the computation and a completion
+ * event that indicates the end of the computation. The simulator works by
+ * traversing the events that are created in a chronological order and by
+ * updating dynamically this list of events depending of the events that are
+ * successively considered. For example, both an unavailability and a completion
+ * event for the same worker can cohabit at the same time. When one of these
+ * events is polled from the list, the other one may be deleted or replaced by
+ * another event.
+ * 
+ * At any time, there is six possible configurations for the events related to a
+ * given worker in the list of events:
+ * 
+ * 1. no event: goes to 2 if the availability trace is read and if the line is
+ * related to the current worker
+ * 
+ * 2. {@link AvailabilityEvent} and {@link UnavailabilityEvent}: goes to 3 if
+ * the {@link AvailabilityEvent} is polled.
+ * 
+ * 3. {@link UnavailabilityEvent}, {@link ProcessCompletionEvent} and
+ * {@link ProcessTimeoutEvent}: goes to 4 if the availability trace is read and
+ * if the line is related to the current worker; goes to 5 if the
+ * {@link UnavailabilityEvent} is polled; stays to 3 if either the
+ * {@link ProcessCompletionEvent} or the {@link ProcessTimeoutEvent} is polled.
+ * 
+ * 4. {@link UnavailabilityEvent}, {@link AvailabilityEvent},
+ * {@link UnavailabilityEvent}, {@link ProcessCompletionEvent} and
+ * {@link ProcessTimeoutEvent}: goes to 6 if the {@link UnavailabilityEvent} is
+ * polled; stays in 4 if either the {@link ProcessCompletionEvent} or the
+ * {@link ProcessTimeoutEvent} is polled.
+ * 
+ * 5. {@link ProcessTimeoutEvent}: goes to 6 if the availability trace is read
+ * and if the line is related to the current worker; goes to 1 if the
+ * {@link ProcessTimeoutEvent} is polled.
+ * 
+ * 6. {@link AvailabilityEvent}, {@link UnavailabilityEvent} and
+ * {@link ProcessTimeoutEvent}: goes to 3 if the {@link AvailabilityEvent} is
+ * polled; goes to 2 if the {@link ProcessTimeoutEvent} is polled.
+ * 
  */
-class Simulator {
+class Simulator implements SchedulerListener {
 
-    /** Logger */
-    private static final Logger logger
-        = Logger.getLogger(Simulator.class.getName());
+	/** Logger */
+	private static final Logger logger = Logger.getLogger(Simulator.class
+			.getName());
 
-    /** This class should not be instanciated */
-    protected Simulator() {
-    }
+	/** Length of the timeout: 10 days */
+	private static final double TIMEOUT = 10 * 24 * 60 * 60;
 
+	private long startingTime;
 
-    /* Configuration parsing part */
+	/** Number of jobs that needs to be computed */
+	private final int jobsNumber;
 
-    private static ResourcesGrouper resourcesGrouper = null;
-    private static ResultCertificator resultCertificator = null;
-    private static ReputationSystem reputationSystem = null;
+	/**
+	 * Scanner from which are iteratively read the availability and
+	 * unavailability events.
+	 */
+	private final Scanner availabilityTrace;
 
-    private static int jobsNumber = 0;
-    private static double jobsCostMean = 0.0d, jobsCostStdDev = 0.0d;
-    private static double jobsArrivalRate = 0.0d;
+	/** Contains the job costs */
+	private final Scanner jobsTrace;
 
-    private static int workersNumber = 0;
-    private static double workersSpeedMin = 0.0d, workersSpeedMax = 0.0d,
-            workersSpeedMean = 0.0d, workersSpeedStdDev = 0.0d;
+	/** Maps the id in the trace files to the created workers */
+	private final Map<Integer, Worker> correspondence;
 
-    private static double reliabilityWorkersFraction1 = 0.0d;
-    private static double reliabilityProbability1 = 0.0d;
-    private static double reliabilityWorkersFraction2 = 0.0d;
-    private static double reliabilityProbability2 = 0.0d;
-    private static double reliabilitySwitchTime = 0.0d;
-    private static double reliabilitySwitchSpeed = 0.0d;
-    private static double reliabilityPropagationRate = 0.0d;
+	private final FileWriter output;
 
-    private static int buggingGroupNumber1 = 0;
-    private static List<Double> buggingWorkersFraction1 = null;
-    private static List<Double> buggingJobsFraction1 = null;
-    private static int buggingGroupNumber2 = 0;
-    private static List<Double> buggingWorkersFraction2 = null;
-    private static List<Double> buggingJobsFraction2 = null;
-    private static double buggingSwitchTime = 0.0d;
-    private static double buggingSwitchSpeed = 0.0d;
-    private static double buggingPropagationRate = 0.0d;
+	/** Ordered set of events that are chronologically considered */
+	private final TreeSet<Event> events = new TreeSet<Event>(
+			new Comparator<Event>() {
+				@Override
+				public int compare(Event arg0, Event arg1) {
+					if (arg0.getDate() < arg1.getDate())
+						return -1;
+					if (arg0.getDate() > arg1.getDate())
+						return 1;
+					if (arg0.hashCode() < arg1.hashCode())
+						return -1;
+					if (arg0.hashCode() > arg1.hashCode())
+						return 1;
+					return 0;
+				}
+			});
 
-    private static int attackingGroupNumber1 = 0;
-    private static List<Double> attackingWorkersFraction1 = null;
-    private static List<Double> attackingProbability1 = null;
-    private static int attackingGroupNumber2 = 0;
-    private static List<Double> attackingWorkersFraction2 = null;
-    private static List<Double> attackingProbability2 = null;
-    private static double attackingSwitchTime = 0.0d;
-    private static double attackingSwitchSpeed = 0.0d;
-    private static double attackingPropagationRate = 0.0d;
+	/**
+	 * Scheduler that gives a job for each worker request and receives the
+	 * results.
+	 */
+	private final Scheduler<Job, Result> scheduler;
 
-    private static enum Parameter {
-        SchedulerComponents, SchedulerSeed,
-        JobsNumber, JobsCostMean, JobsCostStdDev, JobsArrivalRate, JobsSeed,
-        WorkersNumber, WorkersSpeedMin, WorkersSpeedMax, WorkersSpeedMean,
-        WorkersSpeedStdDev, WorkersSeed,
-        ReliabilityWorkersFraction1, ReliabilityProbability1,
-        ReliabilityWorkersFraction2, ReliabilityProbability2,
-        ReliabilitySwitchTime, ReliabilitySwitchSpeed,
-        ReliabilityPropagationRate, ReliabilitySeed,
-        BuggingGroupNumber1, BuggingWorkersFraction1, BuggingJobsFraction1,
-        BuggingGroupNumber2, BuggingWorkersFraction2, BuggingJobsFraction2,
-        BuggingSwitchTime, BuggingSwitchSpeed, BuggingPropagationRate,
-        BuggingSeed,
-        AttackingGroupNumber1, AttackingWorkersFraction1, AttackingProbability1,
-        AttackingGroupNumber2, AttackingWorkersFraction2, AttackingProbability2,
-        AttackingSwitchTime, AttackingSwitchSpeed, AttackingPropagationRate,
-        AttackingSeed;
-    }
+	/** Groups of collusion that are synthetically created */
+	private final List<CollusionGroup> collusionGroups;
 
-    @SuppressWarnings("unchecked")
-    private static void addParameter(String name, String value) {
-        try {
-            switch (Parameter.valueOf(name)) {
-                case JobsNumber: case WorkersNumber: case BuggingGroupNumber1:
-                case BuggingGroupNumber2: case AttackingGroupNumber1:
-                case AttackingGroupNumber2:
-                    if (Integer.valueOf(value) < 0)
-                        throw new Exception(value + " is negative");
-                    break;
-                case JobsCostMean: case JobsCostStdDev: case JobsArrivalRate:
-                case WorkersSpeedMin: case WorkersSpeedMax: case WorkersSpeedMean:
-                case WorkersSpeedStdDev: case ReliabilityWorkersFraction1:
-                case ReliabilityProbability1: case ReliabilityWorkersFraction2:
-                case ReliabilityProbability2: case ReliabilitySwitchTime:
-                case ReliabilitySwitchSpeed: case ReliabilityPropagationRate:
-                case BuggingSwitchTime: case BuggingSwitchSpeed:
-                case BuggingPropagationRate: case AttackingSwitchTime:
-                case AttackingSwitchSpeed: case AttackingPropagationRate:
-                    if (Double.valueOf(value) < 0)
-                        throw new Exception(value + " is negative");
-                    break;
-                default:
-            }
-            switch (Parameter.valueOf(name)) {
-                case SchedulerComponents:
-                    List<String> components = parseList(String.class, value);
-                    if (components.size() != 3) {
-                        logger.severe("Necessarily 3 components in " + components);
-                        System.exit(1);
-                    }
-                    String groupCreatorStr = "simdeg.scheduling." + components.get(0);
-                    resourcesGrouper = (ResourcesGrouper)Class.forName
-                        (groupCreatorStr).newInstance();
-                    String resultSelectorStr = "simdeg.scheduling." + components.get(1);
-                    resultCertificator = (ResultCertificator)Class.forName
-                        (resultSelectorStr).newInstance();
-                    String gridCharacteristicsStr = "simdeg.reputation." + components.get(2);
-                    reputationSystem = (ReputationSystem)Class.forName
-                        (gridCharacteristicsStr).newInstance();
-                    break;
-                case SchedulerSeed:
-                    RandomManager.setSeed("scheduling", Long.valueOf(value));
-                    break;
-                case JobsNumber:
-                    jobsNumber = Integer.valueOf(value);
-                    break;
-                case JobsCostMean:
-                    jobsCostMean = Double.valueOf(value);
-                    break;
-                case JobsCostStdDev:
-                    jobsCostStdDev = Double.valueOf(value);
-                    break;
-                case JobsArrivalRate:
-                    jobsArrivalRate = Double.valueOf(value);
-                    break;
-                case JobsSeed:
-                    RandomManager.setSeed("workload", Long.valueOf(value));
-                    break;
-                case WorkersNumber:
-                    workersNumber = Integer.valueOf(value);
-                    break;
-                case WorkersSpeedMin:
-                    workersSpeedMin = Double.valueOf(value);
-                    break;
-                case WorkersSpeedMax:
-                    workersSpeedMax = Double.valueOf(value);
-                    break;
-                case WorkersSpeedMean:
-                    workersSpeedMean = Double.valueOf(value);
-                    break;
-                case WorkersSpeedStdDev:
-                    workersSpeedStdDev = Double.valueOf(value);
-                    break;
-                case WorkersSeed:
-                    RandomManager.setSeed("platform", Long.valueOf(value));
-                    break;
-                case ReliabilityWorkersFraction1:
-                    reliabilityWorkersFraction1 = Double.valueOf(value);
-                    break;
-                case ReliabilityProbability1:
-                    reliabilityProbability1 = Double.valueOf(value);
-                    break;
-                case ReliabilityWorkersFraction2:
-                    reliabilityWorkersFraction2 = Double.valueOf(value);
-                    break;
-                case ReliabilityProbability2:
-                    reliabilityProbability2 = Double.valueOf(value);
-                    break;
-                case ReliabilitySwitchTime:
-                    reliabilitySwitchTime = Double.valueOf(value);
-                    break;
-                case ReliabilitySwitchSpeed:
-                    reliabilitySwitchSpeed = Double.valueOf(value);
-                    break;
-                case ReliabilityPropagationRate:
-                    reliabilityPropagationRate = Double.valueOf(value);
-                    break;
-                case ReliabilitySeed:
-                    RandomManager.setSeed("reliability", Long.valueOf(value));
-                    break;
-                case BuggingGroupNumber1:
-                    buggingGroupNumber1 = Integer.valueOf(value);
-                    break;
-                case BuggingWorkersFraction1:
-                    buggingWorkersFraction1 = parseList(Double.class, value);
-                    break;
-                case BuggingJobsFraction1:
-                    buggingJobsFraction1 = parseList(Double.class, value);
-                    break;
-                case BuggingGroupNumber2:
-                    buggingGroupNumber2 = Integer.valueOf(value);
-                    break;
-                case BuggingWorkersFraction2:
-                    buggingWorkersFraction2 = parseList(Double.class, value);
-                    break;
-                case BuggingJobsFraction2:
-                    buggingJobsFraction2 = parseList(Double.class, value);
-                    break;
-                case BuggingSwitchTime:
-                    buggingSwitchTime = Double.valueOf(value);
-                    break;
-                case BuggingSwitchSpeed:
-                    buggingSwitchSpeed = Double.valueOf(value);
-                    break;
-                case BuggingPropagationRate:
-                    buggingPropagationRate = Double.valueOf(value);
-                    break;
-                case BuggingSeed:
-                    RandomManager.setSeed("bugging", Long.valueOf(value));
-                    break;
-                case AttackingGroupNumber1:
-                    attackingGroupNumber1 = Integer.valueOf(value);
-                    break;
-                case AttackingWorkersFraction1:
-                    attackingWorkersFraction1 = parseList(Double.class, value);
-                    break;
-                case AttackingProbability1:
-                    attackingProbability1 = parseList(Double.class, value);
-                    break;
-                case AttackingGroupNumber2:
-                    attackingGroupNumber2 = Integer.valueOf(value);
-                    break;
-                case AttackingWorkersFraction2:
-                    attackingWorkersFraction2 = parseList(Double.class, value);
-                    break;
-                case AttackingProbability2:
-                    attackingProbability2 = parseList(Double.class, value);
-                    break;
-                case AttackingSwitchTime:
-                    attackingSwitchTime = Double.valueOf(value);
-                    break;
-                case AttackingSwitchSpeed:
-                    attackingSwitchSpeed = Double.valueOf(value);
-                    break;
-                case AttackingPropagationRate:
-                    attackingPropagationRate = Double.valueOf(value);
-                    break;
-                case AttackingSeed:
-                    RandomManager.setSeed("attacking", Long.valueOf(value));
-                    break;
-            }
-        } catch (ClassNotFoundException e) {
-            logger.log(Level.SEVERE, "Scheduling component " + value
-                    + " is not implemented", e);
-            System.exit(1);
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error while instantiating scheduling "
-                    + "component " + value, e);
-            System.exit(1);
-        }
-        logger.config("Parameter " + name + " is: " + value);
-    }
+	/** Groups of inter-collusion that are synthetically created */
+	private final List<InterCollusionGroup> interCollusionGroups;
 
-    private static void parseConfiguration(String fileName) {
-        try {
-            File file = new File(fileName);
-            Scanner scanner = new Scanner(file);
-            int i=0;
-            while (scanner.hasNextLine()) {
-                String nextLine = scanner.nextLine();
-                if (nextLine.equals("") || nextLine.charAt(0) == '#')
-                    continue;
-                Scanner scannerComment = new Scanner(nextLine);
-                scannerComment.useDelimiter("#");
-                Scanner scannerLine = new Scanner(scannerComment.next());
-                scannerComment.close();
-                scannerLine.useDelimiter(" = ");
-                if (scannerLine.hasNext()){
-                    String name = scannerLine.next();
-                    String value = scannerLine.next();
-                    addParameter(name, value);
-                }
-                scannerLine.close();
-                i++;
-            }
-            scanner.close();
-            if (i != Parameter.values().length) {
-                logger.severe("Only " + i + " on " + Parameter.values().length
-                        + " required parameters in " + fileName);
-                System.exit(1);
-            }
-        } catch (FileNotFoundException e) {
-            logger.log(Level.SEVERE, "File " + fileName + " was not found", e);
-            System.exit(1);
-        }
-        assert(buggingWorkersFraction1.size() >= buggingGroupNumber1
-                && buggingJobsFraction1.size() >= buggingGroupNumber1
-                && buggingWorkersFraction2.size() >= buggingGroupNumber2
-                && buggingJobsFraction2.size() >= buggingGroupNumber2
-                && attackingWorkersFraction1.size() >= attackingGroupNumber1
-                && attackingProbability1.size() >= attackingGroupNumber1
-                && attackingWorkersFraction2.size() >= attackingGroupNumber2
-                && attackingProbability2.size() >= attackingGroupNumber2)
-            : "Not enough values in lists for the groups";
-    }
+	/** Number of distinct jobs that are submitted to the scheduler */
+	private int submittedJobs;
 
-    /**
-     * Platform  file creation.
-     */
-    private static String platformFileGeneration(String fileName) {
-        String platformFileName = fileName + "_platform.xml";
-        File file = new File(platformFileName);
-        DecimalFormat df = new DecimalFormat("0",
-                new DecimalFormatSymbols(Locale.ENGLISH));
-        try {
-            FileWriter fileWriter = new FileWriter(file);
-            fileWriter.write("<?xml version='1.0'?>\n");
-            fileWriter.write("<!DOCTYPE platform SYSTEM \"simgrid.dtd\">\n");
-            fileWriter.write("<platform version=\"2\">\n");
-            fileWriter.write("  <random id=\"rand_cluster\" min=\""
-                    + df.format(workersSpeedMin) + "\" max=\""
-                    + df.format(workersSpeedMax) + "\" mean=\""
-                    + df.format(workersSpeedMean) + "\" std_deviation=\""
-                    + df.format(workersSpeedStdDev) + "\"/>\n");
-            fileWriter.write("  <cluster id=\"cluster\" prefix=\"worker\" " 
-                    + "suffix=\"\" radical=\"0-" + (workersNumber-1)
-                    + "\" power=\"$rand(rand_cluster)\" bw=\"100\" "
-                    + "lat=\"0\" bb_bw=\"100\" bb_lat=\"0\"/>\n");
-            fileWriter.write("</platform>\n");
-            fileWriter.close();
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Error while creating platform file "
-                    + platformFileName, e);
-            System.exit(1);
-        }
-        return platformFileName;
-    }
+	/** Number of distinct jobs that are certified */
+	private int certifiedJobs;
 
-    /**
-     * Creates of switchers for reliability.
-     */
-    private static Set<Switcher<Double>> createReliabilitySwitchers() {
-        /* Create pairs for reliability */
-        Set<Double[]> pairReliability = new HashSet<Double[]>();
-        for (int i=0; i<workersNumber; i++)
-            pairReliability.add(new Double[2]);
-        /* Divide reliable and unreliable in the first and second phase */
-        Set<Double[]> firstReliable = getRandomSubGroup
-            ((int)(reliabilityWorkersFraction1 * workersNumber), pairReliability,
-             RandomManager.getRandom("reliability"));
-        Set<Double[]> secondReliable = getRandomSubGroup
-            ((int)(reliabilityWorkersFraction2 * workersNumber), pairReliability,
-             RandomManager.getRandom("reliability"));
-        /* Determine start-time offsets */
-        Set<Double> startTimes = new HashSet<Double>();
-        double last = 0.0d;
-        for (int i=0; i<workersNumber; i++) {
-            startTimes.add(last);
-            last += RandomManager.getRandom("reliability")
-                .nextExponential(1.0d / reliabilityPropagationRate);
-        }
-        /* Generate switchers */
-        Set<Switcher<Double>> switchers = new HashSet<Switcher<Double>>();
-        for (Double[] switcher : pairReliability) {
-            switcher[0] = reliabilityProbability1;
-            if (firstReliable.contains(switcher))
-                switcher[0] = 1.0d;
-            switcher[1] = reliabilityProbability2;
-            if (secondReliable.contains(switcher))
-                switcher[1] = 1.0d;
-            final Double offset = getRandomSubGroup(1, startTimes,
-                    RandomManager.getRandom("reliability")).iterator().next();
-            startTimes.remove(offset);
-            final double start = reliabilitySwitchTime + offset;
-            final double end = start + 1.0d / reliabilitySwitchSpeed;
-            switchers.add(new Switcher<Double>(switcher, start, end));
-        }
-        assert(switchers.size() == workersNumber)
-            : "Not enough reliability switchers";
-        assert(startTimes.isEmpty()) : "Non deletion of double in a Set";
-        return switchers;
-    }
+	/** Builds a simulator with the given properties and output file */
+	protected Simulator(Properties properties, File output) throws IOException {
+		/* Build workers */
+		final int workersNumber = Integer.parseInt(properties
+				.getProperty("workersNumber"));
+		final File availabilityTraceFile = new File(properties
+				.getProperty("availabilityTraceFile"));
+		correspondence = buildPlatform(workersNumber, availabilityTraceFile);
+		logger.info("Found first " + workersNumber + " workers");
 
-    /**
-     * Creates switchers for bugging groups.
-     */
-    @SuppressWarnings("unchecked")
-    private static Set<Switcher<Set<CollusionGroup>>>
-        createBuggingSwitchers() {
-        /* Create pairs for bugging groups */
-        Set<Set<CollusionGroup>[]> pairBugging
-            = new HashSet<Set<CollusionGroup>[]>();
-        for (int i=0; i<workersNumber; i++) {
-            Set<CollusionGroup>[] pair = new Set[2];
-            pair[0] = new HashSet<CollusionGroup>();
-            pair[1] = new HashSet<CollusionGroup>();
-            pairBugging.add(pair);
-        }
-        /* Divide pairs in bugging groups for the first and second phase */
-        List<Set<Set<CollusionGroup>[]>> firstBugging
-            = new ArrayList<Set<Set<CollusionGroup>[]>>();
-        for (int i=0; i<buggingGroupNumber1; i++)
-            firstBugging.add(getRandomSubGroup
-                    ((int)(buggingWorkersFraction1.get(i) * workersNumber),
-                     pairBugging, RandomManager.getRandom("bugging")));
-        List<Set<Set<CollusionGroup>[]>> secondBugging
-            = new ArrayList<Set<Set<CollusionGroup>[]>>();
-        for (int i=0; i<buggingGroupNumber2; i++)
-            secondBugging.add(getRandomSubGroup
-                    ((int)(buggingWorkersFraction2.get(i) * workersNumber),
-                     pairBugging, RandomManager.getRandom("bugging")));
-        /* Determine start-time offsets */
-        Set<Double> startTimes = new HashSet<Double>();
-        double last = 0.0d;
-        for (int i=0; i<workersNumber; i++) {
-            startTimes.add(last);
-            last += RandomManager.getRandom("bugging")
-                .nextExponential(1.0d / buggingPropagationRate);
-        }
-        /* Generate bugging groups */
-        List<CollusionGroup> buggingGroups1 = new ArrayList<CollusionGroup>();
-        for (int i=0; i<buggingGroupNumber1; i++)
-            buggingGroups1.add(new CollusionGroup(buggingJobsFraction1.get(i), "bugging"));
-        List<CollusionGroup> buggingGroups2 = new ArrayList<CollusionGroup>();
-        for (int i=0; i<buggingGroupNumber2; i++)
-            buggingGroups2.add(new CollusionGroup(buggingJobsFraction2.get(i), "bugging"));
-        /* Generate switchers */
-        Set<Switcher<Set<CollusionGroup>>> switchers
-            = new HashSet<Switcher<Set<CollusionGroup>>>();
-        for (Set<CollusionGroup>[] switcher : pairBugging) {
-            for (int i=0; i<buggingGroupNumber1; i++)
-                if (firstBugging.get(i).contains(switcher))
-                    switcher[0].add(buggingGroups1.get(i));
-            for (int i=0; i<buggingGroupNumber2; i++)
-                if (secondBugging.get(i).contains(switcher))
-                    switcher[1].add(buggingGroups2.get(i));
-            final Double offset = getRandomSubGroup(1, startTimes,
-                    RandomManager.getRandom("bugging")).iterator().next();
-            startTimes.remove(offset);
-            final double start = buggingSwitchTime + offset;
-            final double end = start + 1.0d / buggingSwitchSpeed;
-            switchers.add(new Switcher<Set<CollusionGroup>>(switcher, start, end));
-        }
-        assert(switchers.size() == workersNumber)
-            : "Not enough bugging switchers";
-        assert(startTimes.isEmpty()) : "Non deletion of double in a Set";
-        return switchers;
-    }
+		final File workersSpeedFile = new File(properties
+				.getProperty("workersSpeedFile"));
+		setPlatformSpeed(correspondence, workersSpeedFile);
+		final Set<Worker> workers = new HashSet<Worker>(correspondence.values());
+		logger.info("The speeds of the workers are set");
 
-    /**
-     * Creates switchers for attacking groups.
-     */
-    private static Set<Switcher<CollusionGroup>> createAttackingSwitchers() {
-        /* Create pairs for attacking groups */
-        List<CollusionGroup[]> pairAttacking
-            = new ArrayList<CollusionGroup[]>();
-        for (int i=0; i<workersNumber; i++)
-            pairAttacking.add(new CollusionGroup[2]);
-        /* Divide pairs in attacking groups for the first and second phase */
-        List<Collection<CollusionGroup[]>> firstAttacking
-            = new ArrayList<Collection<CollusionGroup[]>>();
-        List<CollusionGroup[]> pairAttacking1
-            = new ArrayList<CollusionGroup[]>(pairAttacking);
-        for (int i=0; i<attackingGroupNumber1; i++) {
-            final Collection<CollusionGroup[]> attack = getRandomSubGroup
-                ((int)(attackingWorkersFraction1.get(i) * workersNumber),
-                 pairAttacking1, RandomManager.getRandom("attacking"));
-            pairAttacking1.removeAll(attack);
-            firstAttacking.add(attack);
-        }
-        List<Collection<CollusionGroup[]>> secondAttacking
-            = new ArrayList<Collection<CollusionGroup[]>>();
-        List<CollusionGroup[]> pairAttacking2
-            = new ArrayList<CollusionGroup[]>(pairAttacking);
-        for (int i=0; i<attackingGroupNumber2; i++) {
-            final Collection<CollusionGroup[]> attack = getRandomSubGroup
-                ((int)(attackingWorkersFraction2.get(i) * workersNumber),
-                 pairAttacking2, RandomManager.getRandom("attacking"));
-            pairAttacking2.removeAll(attack);
-            secondAttacking.add(attack);
-        }
-        /* Determine start-time offsets */
-        Set<Double> startTimes = new HashSet<Double>();
-        double last = 0.0d;
-        for (int i=0; i<workersNumber; i++) {
-            startTimes.add(last);
-            last += RandomManager.getRandom("attacking")
-                .nextExponential(1.0d / attackingPropagationRate);
-        }
-        /* Generate attacking groups */
-        List<CollusionGroup> attackingGroups1 = new ArrayList<CollusionGroup>();
-        for (int i=0; i<attackingGroupNumber1; i++)
-            attackingGroups1.add(new CollusionGroup(attackingProbability1.get(i), "attacking"));
-        List<CollusionGroup> attackingGroups2 = new ArrayList<CollusionGroup>();
-        for (int i=0; i<attackingGroupNumber2; i++)
-            attackingGroups2.add(new CollusionGroup(attackingProbability2.get(i), "attacking"));
-        /* Generate switchers */
-        Set<Switcher<CollusionGroup>> switchers
-            = new HashSet<Switcher<CollusionGroup>>();
-        for (CollusionGroup[] switcher : pairAttacking) {
-            switcher[0] = null;
-            for (int i=0; i<attackingGroupNumber1; i++)
-                if (firstAttacking.get(i).contains(switcher))
-                    switcher[0] = attackingGroups1.get(i);
-            switcher[1] = null;
-            for (int i=0; i<attackingGroupNumber2; i++)
-                if (secondAttacking.get(i).contains(switcher))
-                    switcher[1] = attackingGroups2.get(i);
-            final Double offset = getRandomSubGroup(1, startTimes,
-                    RandomManager.getRandom("attacking")).iterator().next();
-            startTimes.remove(offset);
-            final double start = attackingSwitchTime + offset;
-            final double end = start + 1.0d / attackingSwitchSpeed;
-            switchers.add(new Switcher<CollusionGroup>(switcher, start, end));
-        }
-        assert(switchers.size() == workersNumber)
-            : "Not enough attacking switchers";
-        assert(startTimes.isEmpty()) : "Non deletion of double in a Set";
-        return switchers;
-    }
+		final double reliabilityFraction = Double.parseDouble(properties
+				.getProperty("reliabilityFraction"));
+		final double reliabilityProbability = Double.parseDouble(properties
+				.getProperty("reliabilityProbability"));
+		setPlatformReliability(workers, reliabilityFraction,
+				reliabilityProbability);
+		logger.info("The reliability of the workers are set");
 
-    /**
-     * Creation of workers with corresponding reliability and collusion
-     * behavior.
-     */
-    private static Set<Worker> initializeWorkers()
-        throws JniException, NativeException {
+		/* Build collusion groups */
+		List<Double> collusionFraction = parseList(Double.class, properties
+				.getProperty("collusionFraction"));
+		List<Double> collusionProbability = parseList(Double.class, properties
+				.getProperty("collusionProbability"));
+		collusionGroups = buildCollusionGroup(workers, collusionFraction,
+				collusionProbability);
+		logger.info("The workers are set in groups of collusion");
 
-        /* Reliability, bugging and attacking probabilities generation */
-        Set<Switcher<Double>> reliabilitySwitchers
-            = createReliabilitySwitchers();
-        Set<Switcher<Set<CollusionGroup>>> buggingSwitchers
-            = createBuggingSwitchers();
-        Set<Switcher<CollusionGroup>> attackingSwitchers
-            = createAttackingSwitchers();
+		/* Build inter-collusion groups */
+		List<List<Integer>> interCollusionFraction = parseListOfList(
+				Integer.class, properties.getProperty("interCollusionFraction"));
+		List<Double> interCollusionProbability = parseList(Double.class,
+				properties.getProperty("interCollusionProbability"));
+		interCollusionGroups = buildInterCollusionGroup(workers,
+				collusionGroups, interCollusionFraction,
+				interCollusionProbability);
+		logger
+				.info("The groups of collusion are set in groups of inter-collusion");
+		/* Decision tree creation */
+		new InterCollusionDecisionTree(interCollusionGroups);
+		logger.info("Decision tree is built");
 
-        /* Create data structure for the Evaluator */
-        Map<Worker,Switcher<Double>> workersReliability
-            = new HashMap<Worker,Switcher<Double>>();
-        Map<Worker,Switcher<Set<CollusionGroup>>> buggingGroups
-            = new HashMap<Worker,Switcher<Set<CollusionGroup>>>();
-        Map<Worker,Switcher<CollusionGroup>> attackingGroups
-            = new HashMap<Worker,Switcher<CollusionGroup>>();
+		/* Workload parameters */
+		jobsNumber = Integer.parseInt(properties.getProperty("jobsNumber"));
 
-        /* Build workers with the generated switchers */
-        Host[] hosts = Host.all();
-        for (int i=0; i<workersNumber; i++) {
-            final Switcher<Double> reliable
-                = reliabilitySwitchers.iterator().next();
-            reliabilitySwitchers.remove(reliable);
-            final Switcher<Set<CollusionGroup>> bugging
-                = buggingSwitchers.iterator().next();
-            buggingSwitchers.remove(bugging);
-            final Switcher<CollusionGroup> attack
-                = attackingSwitchers.iterator().next();
-            attackingSwitchers.remove(attack);
-            final Worker worker = new Worker(hosts[i], hosts[i].getName(),
-                    reliable, bugging, attack);
-            workersReliability.put(worker, reliable);
-            buggingGroups.put(worker, bugging);
-            attackingGroups.put(worker, attack);
-            logger.config("Worker " + worker.getName()
-                    + " created with reliability switcher " + reliable
-                    + ", bugging groups switcher " + bugging
-                    + " and attacking group switcher " + attack);
-        }
+		/* Initialize the trace inputs */
+		availabilityTrace = new Scanner(availabilityTraceFile);
+		jobsTrace = new Scanner(new File(properties
+				.getProperty("jobsTraceFile")));
+		jobsTrace.nextLine();
 
-        /* Inform the evaluator of the workers characteristics */
-        Evaluator.setWorkersFaultiness(workersReliability,
-                buggingGroups, attackingGroups);
+		/* Build scheduling components */
+		String schedulerClassName = properties.getProperty("scheduler");
+		String resultCertificatorClassName = properties
+				.getProperty("resultCertificator");
+		String reputationSystemClassName = properties
+				.getProperty("reputationSystem");
+		scheduler = getScheduler(schedulerClassName,
+				resultCertificatorClassName, reputationSystemClassName);
 
-        return workersReliability.keySet();
-    }
+		/* Initialize the scheduler */
+		scheduler.addAllWorkers(workers);
+		scheduler.putSchedulerListener(this);
 
-    /**
-     * Initialize the server with correct workload and scheduler.
-     */
-    private static void initializeServer(Set<Worker> workers)
-        throws JniException, NativeException {
-        new Server(workers, new Scheduler<Job,Result>(resourcesGrouper,
-                    resultCertificator, reputationSystem),
-                jobsNumber, jobsCostMean, jobsCostStdDev, jobsArrivalRate);
-        Evaluator.setGridCharacteristics(reputationSystem);
-    }
+		this.output = new FileWriter(output);
+	}
 
-    /**
-     * Main part of the simulator.
-     */
-    public static void main(String[] args)
-        throws JniException, NativeException {
+	/**
+	 * Creates a simulator with the property and output files given in the
+	 * arguments. It then runs the simulation.
+	 */
+	public static void main(String[] args) throws IOException {
+		Locale.setDefault(Locale.ENGLISH);
+		if (args.length < 2) {
+			System.err.println("Usage : java simdeg.simulator.Simulator"
+					+ " configurationFile outputFile");
+			System.exit(1);
+		}
 
-        Msg.init(args);
+		final Properties properties = new Properties();
+		properties.load(new FileInputStream(args[0]));
+		final Simulator simulator = new Simulator(properties, new File(args[1]));
+		simulator.run();
+	}
 
-        if(args.length < 1) {
-            logger.severe("Usage : java simulator.simulator configuration_file");
-            System.exit(1);
-        }
+	/**
+	 * Reads in the availability trace file the {@link AvailabilityEvent} and
+	 * {@link UnavailabilityEvent} events.
+	 */
+	private void addAvailabilityEvent() {
+		if (!availabilityTrace.hasNext())
+			return;
+		int id = availabilityTrace.nextInt();
+		while (!correspondence.containsKey(id)) {
+			availabilityTrace.nextDouble();
+			availabilityTrace.nextDouble();
+			if (!availabilityTrace.hasNext())
+				return;
+			id = availabilityTrace.nextInt();
+		}
+		final Worker worker = correspondence.get(id);
+		final double start = availabilityTrace.nextDouble();
+		final double stop = availabilityTrace.nextDouble();
+		events.add(new AvailabilityEvent(start, worker));
+		events.add(new UnavailabilityEvent(stop, worker));
+		logger.fine("New events added for worker " + id + " starting at time "
+				+ start + " and stopping at " + stop);
+	}
 
-        /* Parse parameters from the configuration file */
-        parseConfiguration(args[0]);
+	/**
+	 * Assigns a job to a given worker at the specified date. Updates associated
+	 * structures such as the list of events. Also, creates the timeout event.
+	 */
+	private void assignNewJob(Worker worker, Job job, double date) {
+		worker.assignJob(job);
+		if (job == null)
+			return;
+		final ProcessTimeoutEvent timeout = new ProcessTimeoutEvent(date
+				+ TIMEOUT, worker, job);
+		worker.setNextProcessTimeoutEvent(timeout);
+		events.add(timeout);
+		logger.fine("Put timeout for worker " + worker + " and job " + job
+				+ " at time " + (date + TIMEOUT));
+	}
 
-        /* Construct the platform (physical hosts) */
-        String platformFileName = platformFileGeneration(args[0]);
-        Msg.createEnvironment(platformFileName);
+	/**
+	 * Determine when the next completion event must take place given the
+	 * current date in the simulation. Update associated structure such as the
+	 * list of events.
+	 */
+	private void computeCompletionEvent(Worker worker, double date) {
+		final Job job = worker.getCurrentJob();
+		if (job == null)
+			return;
+		final double computationTime = worker.getRemainingTime();
+		final ProcessCompletionEvent completion = new ProcessCompletionEvent(
+				date + computationTime, worker, job);
+		worker.setNextProcessCompletionEvent(completion);
+		events.add(completion);
+		logger.fine("Process completion time for worker " + worker
+				+ " and job " + job + " estimated at time "
+				+ (date + computationTime));
+	}
 
-        /* Deploy the application */
-        Set<Worker> workers = initializeWorkers();
+	/**
+	 * Starts the simulation by submitting a single job to the scheduler and by
+	 * reading the first line of the availability trace file. It then processes
+	 * each event as they appear in the list of events.
+	 */
+	protected void run() {
+		startingTime = System.currentTimeMillis();
+		endOfJobQueue();
+		addAvailabilityEvent();
+		while (!events.isEmpty()) {
+			final Event event = events.pollFirst();
+			final double date = event.getDate();
+			final Worker worker = event.getWorker();
+			if (event instanceof AvailabilityEvent) {
+				logger.fine("Worker " + worker + " becomes available at time "
+						+ date);
+				if (worker.getPreviousAvailabilityEvent() != null
+						&& worker.getPreviousAvailabilityEvent() instanceof AvailabilityEvent)
+					throw new UnsupportedOperationException(
+							"A worker may not be available twice successively at time "
+									+ date);
+				/*
+				 * Find a job to compute for this worker, which appears for the
+				 * first time.
+				 */
+				if (worker.getCurrentJob() == null) {
+					/* Request a new job */
+					final Job newJob = scheduler.submitResultAndPullJob(worker,
+							null, null);
+					/* Assign the job */
+					assignNewJob(worker, newJob, date);
+				}
+				/* Compute the time by which this job will be completed */
+				computeCompletionEvent(worker, date);
+				/* Update current status of the worker */
+				worker.setPreviousAvailabilityEvent(event);
+				/* Add the next availability event */
+				addAvailabilityEvent();
+			} else if (event instanceof UnavailabilityEvent) {
+				logger.fine("Worker " + worker
+						+ " becomes unavailable at time " + date);
+				if (worker.getPreviousAvailabilityEvent() == null
+						|| worker.getPreviousAvailabilityEvent() instanceof UnavailabilityEvent)
+					throw new UnsupportedOperationException(
+							"A worker may not be unavailable twice successively at time "
+									+ date);
+				if (worker.getNextProcessCompletionEvent() != null) {
+					/*
+					 * Remove the completion event of the job assigned to the
+					 * current worker, it will be recreated when the worker
+					 * becomes available again.
+					 */
+					events.remove(worker.getNextProcessCompletionEvent());
+					/* Update progress done on the job */
+					worker.updateRemainingTime(date);
+					worker.setNextProcessCompletionEvent(null);
+				}
+				/* Update current status of the worker */
+				worker.setPreviousAvailabilityEvent(event);
+			} else if (event instanceof ProcessCompletionEvent) {
+				/* Retrieve the job this event is about */
+				final Job job = ((ProcessCompletionEvent) event).getJob();
+				logger.fine("Worker " + worker
+						+ " has finished its assigned job " + job + " at time "
+						+ date);
+				if (worker.getPreviousAvailabilityEvent() == null
+						|| worker.getPreviousAvailabilityEvent() instanceof UnavailabilityEvent)
+					throw new UnsupportedOperationException(
+							"A worker may not complete a job while being unavailable  at time "
+									+ date);
+				events.remove(worker.getNextProcessTimeoutEvent());
+				/* Consider the result of the worker for this job */
+				final Result result = worker.getResult(job);
+				/* Submit result and request a new job */
+				final Job newJob = scheduler.submitResultAndPullJob(worker,
+						job, result);
+				/* Assign the job */
+				assignNewJob(worker, newJob, date);
+				/* Compute the time by which this job will be completed */
+				computeCompletionEvent(worker, date);
+			} else if (event instanceof ProcessTimeoutEvent) {
+				/* Retrieve the job this event is about */
+				final Job job = ((ProcessTimeoutEvent) event).getJob();
+				logger.fine("Worker " + worker
+						+ " has reached its timeout for job " + job
+						+ " at time " + date);
+				/* Gives up on the job */
+				scheduler.submitResultAndPullJob(worker, job, null);
+				if (worker.getPreviousAvailabilityEvent() instanceof UnavailabilityEvent) {
+					worker.assignJob(null);
+					assert (worker.getNextProcessCompletionEvent() == null) : "No completion event if timeout is reached while unavailability phase";
+				} else {
+					events.remove(worker.getNextProcessCompletionEvent());
+					/* Request a new job */
+					final Job newJob = scheduler.submitResultAndPullJob(worker,
+							null, null);
+					/* Assign the job */
+					assignNewJob(worker, newJob, date);
+					/* Compute the time by which this job will be completed */
+					computeCompletionEvent(worker, date);
+				}
+			} else
+				throw new RuntimeException(
+						"Not considering other type of events");
+		}
+		stop();
+	}
 
-        /* Server construction */
-        initializeServer(workers);
+	/**
+	 * Finalizes the simulation and generates the outputs.
+	 */
+	private void stop() {
+		logger.fine("Simulation ends");
+		availabilityTrace.close();
+		jobsTrace.close();
+		try {
+			// TODO remove this
+			if (scheduler.getReputationSystem() != null)
+				output.write(scheduler.getReputationSystem() + "");
+			output.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
-        /* Launch the simulation */
-        Msg.run();
-    }
+	/**
+	 * Builds the platform by making a correspondence between each id in the
+	 * availability trace file to a worker.
+	 */
+	private static Map<Integer, Worker> buildPlatform(int workersNumber,
+			File availabilityTraceFile) throws FileNotFoundException {
+		if (workersNumber <= 0.0d)
+			throw new OutOfRangeException(workersNumber, 1, Integer.MAX_VALUE);
+
+		final Map<Integer, Worker> workers = new HashMap<Integer, Worker>();
+		Scanner scanner = new Scanner(availabilityTraceFile);
+		scanner.useDelimiter("\\s[0-9.]+\\s[0-9.]+\\n");
+		Set<Integer> ids = new HashSet<Integer>();
+		while (scanner.hasNext() && workers.size() < workersNumber) {
+			final int id = scanner.nextInt();
+			if (!ids.contains(id))
+				workers.put(id, new Worker());
+		}
+		scanner.close();
+		return workers;
+	}
+
+	/**
+	 * Sets the speed of each worker with the workers performance file.
+	 */
+	private static void setPlatformSpeed(Map<Integer, Worker> correspondence,
+			File workersSpeedFile) throws FileNotFoundException {
+		int done = 0;
+		Scanner scanner = new Scanner(workersSpeedFile);
+		scanner.nextLine();
+		while (scanner.hasNextLine() && done != correspondence.size()) {
+			scanner.next();
+			final int id = scanner.nextInt();
+			if (correspondence.containsKey(id)) {
+				scanner.next();
+				scanner.next();
+				try {
+					final double fops = scanner.nextDouble();
+					correspondence.get(id).setFOPS(fops);
+					done++;
+				} catch (InputMismatchException e) {
+					System.err.println("Missing values in the platform file");
+					System.exit(1);
+				}
+			}
+			scanner.nextLine();
+		}
+		scanner.close();
+		if (done != correspondence.size())
+			throw new UnsupportedOperationException(
+					"Some worker speeds are not set");
+	}
+
+	/**
+	 * Assigns a reliability (probability of failure) to each worker.
+	 */
+	private static void setPlatformReliability(Set<Worker> workers,
+			double reliabilityFraction, double reliabilityProbability) {
+		if (reliabilityFraction <= 0.0d || reliabilityProbability > 1.0d)
+			throw new OutOfRangeException(reliabilityFraction, 0.0d, 1.0d);
+		if (reliabilityProbability < 0.0d || reliabilityProbability > 1.0d)
+			throw new OutOfRangeException(reliabilityProbability, 0.0d, 1.0d);
+
+		Set<Worker> unreliable = getRandomSubGroup(
+				(int) ((1.0d - reliabilityFraction) * workers.size()), workers,
+				RandomManager.getRandom("platform"));
+		for (Worker worker : unreliable)
+			worker.setReliability(reliabilityProbability);
+	}
+
+	/**
+	 * Builds the groups of collusion.
+	 */
+	private static List<CollusionGroup> buildCollusionGroup(
+			Set<Worker> workers, List<Double> collusionFraction,
+			List<Double> collusionProbability) {
+		double correct = 1.0d;
+		for (double fraction : collusionFraction)
+			correct -= fraction;
+		for (double fraction : collusionFraction)
+			if (fraction >= correct)
+				throw new IllegalArgumentException(
+						"Correct workers are not in the majority");
+		if (collusionFraction.size() != collusionProbability.size())
+			throw new IllegalArgumentException("Colluders incorrecly specified");
+
+		Set<Worker> candidates = new HashSet<Worker>(workers);
+		List<CollusionGroup> collusionGroups = new ArrayList<CollusionGroup>();
+		for (int i = 0; i < collusionFraction.size(); i++) {
+			CollusionGroup collusionGroup = new CollusionGroup(
+					collusionProbability.get(i));
+			Set<Worker> colluders = getRandomSubGroup((int) (collusionFraction
+					.get(i) * workers.size()), candidates, RandomManager
+					.getRandom("platform"));
+			collusionGroup.addAll(colluders);
+			candidates.removeAll(colluders);
+			collusionGroups.add(collusionGroup);
+		}
+		return collusionGroups;
+	}
+
+	/**
+	 * Builds the groups of inter-collusion.
+	 */
+	private static List<InterCollusionGroup> buildInterCollusionGroup(
+			Set<Worker> workers, List<CollusionGroup> collusionGroups,
+			List<List<Integer>> interCollusionFraction,
+			List<Double> interCollusionProbability) {
+		if (interCollusionFraction.size() != interCollusionProbability.size())
+			throw new IllegalArgumentException(
+					"Inter-colluders incorrecly specified");
+
+		List<InterCollusionGroup> interCollusionGroups = new ArrayList<InterCollusionGroup>();
+		for (int i = 0; i < interCollusionFraction.size(); i++) {
+			if (interCollusionFraction.get(i).size() < 2)
+				throw new IllegalArgumentException(
+						"Inter-colluders need at least two colluder groups");
+			InterCollusionGroup interColluderGroup = new InterCollusionGroup(
+					interCollusionProbability.get(i));
+			for (int index : interCollusionFraction.get(i))
+				interColluderGroup.add(collusionGroups.get(index));
+			interCollusionGroups.add(interColluderGroup);
+		}
+		return interCollusionGroups;
+	}
+
+	/**
+	 * Instantiates the components used for scheduling, certifying and
+	 * characterizing.
+	 */
+	@SuppressWarnings("unchecked")
+	private static Scheduler<Job, Result> getScheduler(
+			String schedulerClassName, String resultCertificatorClassName,
+			String reputationSystemClassName) {
+		ReputationSystem reputationSystem = null;
+		if (!reputationSystemClassName.equals("null"))
+			try {
+				reputationSystem = (ReputationSystem) Class.forName(
+						"simdeg.reputation." + reputationSystemClassName)
+						.newInstance();
+			} catch (Exception e) {
+				System.err.println("ReputationSystem "
+						+ reputationSystemClassName + " not found");
+				System.exit(1);
+			}
+
+		ResultCertificator resultCertificator = null;
+		try {
+			resultCertificator = (ResultCertificator) Class.forName(
+					"simdeg.scheduling." + resultCertificatorClassName)
+					.newInstance();
+		} catch (Exception e) {
+			System.err.println("ResultCertificator "
+					+ resultCertificatorClassName + " not found");
+			System.exit(1);
+		}
+
+		/* Find the scheduler */
+		try {
+			Constructor<?> construct = Class.forName(
+					"simdeg.scheduling." + schedulerClassName).getConstructor(
+					ResultCertificator.class, ReputationSystem.class);
+			return (Scheduler<Job, Result>) construct.newInstance(
+					resultCertificator, reputationSystem);
+		} catch (Exception e) {
+			System.err
+					.println("Scheduler " + schedulerClassName + " not found");
+			System.exit(1);
+		}
+
+		return null;
+	}
+
+	@Override
+	public void endOfJobQueue() {
+		if (submittedJobs < jobsNumber && jobsTrace.hasNext()) {
+			for (int i = 0; i < 5; i++)
+				jobsTrace.next();
+			submittedJobs++;
+			final double fops = jobsTrace.nextDouble();
+			final Job job = new Job(fops);
+			logger.fine("Create new job " + job + " with " + fops + " FOPS");
+			scheduler.addJob(job);
+		}
+	}
+
+	@Override
+	public <J extends simdeg.reputation.Job, R extends simdeg.reputation.Result> void setCertifiedResult(
+			VotingPool<R> votingPool, R result) {
+		assert (submittedJobs >= certifiedJobs) : "More certified jobs than submitted ones";
+		certifiedJobs++;
+		if (certifiedJobs == jobsNumber)
+			events.clear();
+		/* Printing progress information */
+		if (certifiedJobs % 10000 == 0) {
+			System.out
+					.println(certifiedJobs + " " + System.currentTimeMillis());
+			// System.out.println(scheduler.getReputationSystem());
+		}
+		/* Cleaning internal structures */
+		for (CollusionGroup collusionGroup : collusionGroups)
+			collusionGroup.clear((Job) votingPool.getJob());
+		for (InterCollusionGroup interCollusionGroup : interCollusionGroups)
+			interCollusionGroup.clear((Job) votingPool.getJob());
+		/* Printing results in the output file */
+		try {
+			output.write(result + " " + votingPool.size() + " "
+					+ (System.currentTimeMillis() - startingTime) + "\n");
+			output.flush();
+		} catch (IOException e) {
+			System.err.println("Problem writing in the output file");
+			System.exit(1);
+		}
+	}
 
 }

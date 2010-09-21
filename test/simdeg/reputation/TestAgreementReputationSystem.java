@@ -20,7 +20,7 @@ import org.junit.Test;
 
 /* TODO add test
  * This test should focus more on the internal operations such as split and
- * merge. For instance, it should contains several independent scenarii. Also,
+ * merge. For instance, it should contains several independent scenarios. Also,
  * the number of transformation should be low.
  * A test with 2 sets with proba 1.
  * A test with 2 sets without random and proba 0.5.
@@ -69,40 +69,40 @@ public class TestAgreementReputationSystem {
     }
 
     @Test public void setAgreement() {
-        AgreementReputationSystem ars = new AgreementReputationSystem();
+        AgreementReputationSystem<Worker> ars = new AgreementReputationSystem<Worker>();
         ars.addAllWorkers(workers);
         ars.setAgreement(new Job() {}, worker, workers);
     }
 
     @Test(expected=NoSuchElementException.class)
     public void setAgreementException() {
-        AgreementReputationSystem ars = new AgreementReputationSystem();
+        AgreementReputationSystem<Worker> ars = new AgreementReputationSystem<Worker>();
         ars.addAllWorkers(workers);
         ars.removeAllWorkers(addElement(worker, new HashSet<Worker>()));
         ars.setAgreement(new Job() {}, worker, workers);
     }
 
     @Test public void setDisagreement() {
-        AgreementReputationSystem ars = new AgreementReputationSystem();
+        AgreementReputationSystem<Worker> ars = new AgreementReputationSystem<Worker>();
         ars.addAllWorkers(workers);
         ars.setDisagreement(new Job() {}, worker, workers);
     }
 
     @Test(expected=NoSuchElementException.class)
     public void setDisagreementException() {
-        AgreementReputationSystem ars = new AgreementReputationSystem();
+        AgreementReputationSystem<Worker> ars = new AgreementReputationSystem<Worker>();
         ars.addAllWorkers(workers);
         ars.removeAllWorkers(addElement(worker, new HashSet<Worker>()));
         ars.setDisagreement(new Job() {}, worker, workers);
     }
 
     @Test public void setDistinctSets() {
-        AgreementReputationSystem ars = new AgreementReputationSystem();
+        AgreementReputationSystem<Worker> ars = new AgreementReputationSystem<Worker>();
         ars.setDistinctSets(new Job() {}, workers, new HashSet<Set<Worker>>());
     }
 
     @Test public void getCollusionLikelihood() {
-        AgreementReputationSystem ars = new AgreementReputationSystem();
+        AgreementReputationSystem<Worker> ars = new AgreementReputationSystem<Worker>();
         ars.addAllWorkers(workers);
         RV collusion = ars.getCollusionLikelihood(workers);
         assertEquals(0.0d, collusion.getMean(), collusion.getError());
@@ -118,7 +118,7 @@ public class TestAgreementReputationSystem {
 
     @Test public void scenarioSimple() {
         /* Initializations and declarations */
-        AgreementReputationSystem ars = new AgreementReputationSystem();
+        AgreementReputationSystem<Worker> ars = new AgreementReputationSystem<Worker>();
         Set<Worker> workersTwo = new HashSet<Worker>();
         workersTwo.addAll(workersList.get(0));
         workersTwo.addAll(workersList.get(1));
@@ -150,7 +150,7 @@ public class TestAgreementReputationSystem {
 
     @Test public void scenario() {
         /* Initializations and declarations */
-        AgreementReputationSystem ars = new AgreementReputationSystem();
+        AgreementReputationSystem<Worker> ars = new AgreementReputationSystem<Worker>();
         ars.addAllWorkers(workers);
         final int[][] scheme = new int[][] {
                 {0, 0, 0, 2, 2, 0},
@@ -202,7 +202,7 @@ public class TestAgreementReputationSystem {
         set.addAll(workersList.get(5));
         RV collusion4 = ars.getCollusionLikelihood(set);
         assertEquals(0.1d, collusion4.getMean(), collusion4.getError());
-        /* Fith case (this value should be 0.1d, but we do our best) */
+        /* Fifth case (this value should be 0.1d, but we do our best) */
         set.clear();
         set.addAll(workersList.get(3));
         set.addAll(workersList.get(4));

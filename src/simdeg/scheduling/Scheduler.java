@@ -1,10 +1,8 @@
 package simdeg.scheduling;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -19,92 +17,78 @@ import simdeg.reputation.Worker;
  * Main component of the scheduling package. It provides a generic interface for
  * assembling scheduling component to form a policy.
  */
-public class Scheduler<J extends Job, R extends Result> {
+abstract public class Scheduler<J extends Job, R extends Result> {
 
 	/** Logger */
 	private static final Logger logger = Logger.getLogger(Scheduler.class
 			.getName());
 
-	/* Components of the scheduler */
-	private ResourcesGrouper resourcesGrouper = null;
+	/** Component for certifying one result for each job */
+	private ResultCertificator resultCertificator;
 
-	private ResultCertificator resultCertificator = null;
-
-	private ReputationSystem reputationSystem = null;
-
-	/* Basic structures for queuing scheduled and non-scheduled jobs */
+	/**
+	 * Component that characterize the reliability of the platform based on the
+	 * observations.
+	 */
+	protected ReputationSystem<Worker> reputationSystem;
 
 	/** Jobs available for being added to workers waiting queues */
-	private Queue<J> availableJobs = new ArrayDeque<J>();
+	protected Queue<J> availableJobs = new ArrayDeque<J>();
 
-	/** Jobs queue for each worker */
-	private Map<Worker, Queue<J>> jobsQueue = new HashMap<Worker, Queue<J>>();
+	/** Jobs that have been processed but not currently */
+	protected Set<J> activeJobs = new HashSet<J>();
 
-	/** List of workers assigned to each job */
-	private Map<J, Set<Worker>> workersJob = new HashMap<J, Set<Worker>>();
+	/** Jobs being processed by at least one worker */
+	protected Set<J> processingJobs = new HashSet<J>();
 
-	/* Structure for storing incomplete result sets */
+	/** Each terminated jobs has one certified result and is not being processed */
+	private Set<J> terminatedJobs = new HashSet<J>();
 
-	/** List of workers assigned to each job (for progression status) */
-	private Map<J, List<Worker>> resultingWorkers = new HashMap<J, List<Worker>>();
+	/**
+	 * Voting pools obtained so far (keys correspond to all jobs except those
+	 * that are available).
+	 */
+	protected Map<J, VotingPool<R>> votingPools = new HashMap<J, VotingPool<R>>();
 
-	/** List of results for each job (for progression status) */
-	private Map<J, List<R>> resultingResults = new HashMap<J, List<R>>();
-
-	/** Jobs that have been postponed */
-	private Set<J> postponedJobs = new HashSet<J>();
-
-	/** Certified results for each job */
-	private Map<J, R> resultsFound = new HashMap<J, R>();
+	private SchedulerListener listener;
 
 	/**
 	 * Constructs a Scheduler with the given components.
 	 */
-	public Scheduler(ResourcesGrouper resourcesGrouper,
-			ResultCertificator resultCertificator,
-			ReputationSystem reputationSystem) {
-		this.resourcesGrouper = resourcesGrouper;
+	public Scheduler(ResultCertificator resultCertificator,
+			ReputationSystem<Worker> reputationSystem) {
 		this.resultCertificator = resultCertificator;
 		this.reputationSystem = reputationSystem;
-		this.resourcesGrouper.setReputationSystem(reputationSystem);
 		this.resultCertificator.setReputationSystem(reputationSystem);
-		logger.info("Scheduler created with " + resourcesGrouper + ", "
-				+ resultCertificator + ", and " + reputationSystem);
+		logger.info(this + " created with " + resultCertificator + " and "
+				+ reputationSystem);
 	}
 
 	/**
 	 * Adds participating workers.
 	 */
 	public void addAllWorkers(Set<? extends Worker> workers) {
-		for (Worker worker : workers)
-			jobsQueue.put(worker, new ArrayDeque<J>());
-		this.resourcesGrouper.addAllWorkers(workers);
-		this.reputationSystem.addAllWorkers(workers);
-		logger.info("Adding " + workers.size() + " workers");
+		if (reputationSystem != null)
+			reputationSystem.addAllWorkers(workers);
 	}
 
 	/**
 	 * Removes participating workers.
 	 */
 	public void removeAllWorkers(Set<? extends Worker> workers) {
-		for (Worker worker : workers)
-			jobsQueue.remove(worker);
-		this.resourcesGrouper.removeAllWorkers(workers);
-		this.reputationSystem.removeAllWorkers(workers);
+		if (reputationSystem != null)
+			reputationSystem.removeAllWorkers(workers);
 	}
 
 	/**
-	 * Adds a single workunit to be treated.
+	 * Adds a single work-unit to be treated.
 	 */
 	public void addJob(J job) {
 		this.availableJobs.add(job);
-		workersJob.put(job, new HashSet<Worker>());
-		resultingWorkers.put(job, new ArrayList<Worker>());
-		resultingResults.put(job, new ArrayList<R>());
 	}
 
 	/**
-	 * Adds a workload to be treated.
+	 * Adds a workload to be treated in an arbitrary order.
 	 */
 	public void addAllJobs(Set<J> jobs) {
 		for (J job : jobs)
@@ -112,112 +96,120 @@ public class Scheduler<J extends Job, R extends Result> {
 	}
 
 	/**
-	 * Puts the given job in the queues of every specified workers.
+	 * Gives access to the reputation system that is used to characterize the
+	 * platform.
 	 */
-	private void putJobsInQueue(J job, Set<Worker> workers) {
-		for (Worker worker : workers) {
-			jobsQueue.get(worker).offer(job);
-			workersJob.get(job).add(worker);
-		}
+	public ReputationSystem<Worker> getReputationSystem() {
+		return reputationSystem;
 	}
 
 	/**
-	 * Requests a job for a given worker. This method justifies the use of
-	 * generics.
+	 * Tests whether a worker is working on any job or not.
 	 */
-	public J requestJob(Worker worker) {
-		if (jobsQueue.get(worker).isEmpty()) {
-			if (availableJobs.isEmpty())
-				return null;
-			J job = availableJobs.poll();
-			Set<Worker> currentWorkers = resourcesGrouper.getGroup(worker);
-			putJobsInQueue(job, currentWorkers);
-			logger.fine("Creation of a group for job " + job + ": "
-					+ currentWorkers);
-		}
-		return jobsQueue.get(worker).poll();
-	}
-
-	/**
-	 * Completes last update and cleans useless data concerning a job.
-	 */
-	private void completeJob(J job, R result) {
-		/* Last updates */
-		reputationSystem.setCertifiedResult(job, result);
-		/* Cleaning */
-		resultingWorkers.remove(job);
-		resultingResults.remove(job);
-		workersJob.remove(job);
-	}
-
-	/**
-	 * Tries to get the best result for the given job.
-	 */
-	private void findJobResult(J job) {
-		List<Worker> workersList = resultingWorkers.get(job);
-		List<R> resultsList = resultingResults.get(job);
-		try {
-			R result = resultCertificator.selectBestResult(workersList,
-					resultsList);
-			completeJob(job, result);
-			resultsFound.put(job, result);
-		} catch (JobPostponedException e) {
-			postponedJobs.add(job);
-		} catch (ResultCertificationException e) {
-			/* Try to get an extension of the current worker group */
-			Set<Worker> currentWorkers = resourcesGrouper
-					.getGroupExtension(new HashSet<Worker>(workersList));
-			logger.fine("Creation of a group extension for job " + job + ": "
-					+ currentWorkers);
-			if (currentWorkers != null)
-				putJobsInQueue(job, currentWorkers);
-			else {
-				/* Choose the less worse result */
-				logger.fine("The less worse result will now be selected in "
-						+ "a group of size " + workersList.size());
-				R result = resultCertificator.selectLessWorseResult(
-						workersList, resultsList);
-				completeJob(job, result);
-				resultsFound.put(job, result);
-			}
-		}
+	private boolean isAssigned(Worker worker) {
+		for (VotingPool<R> votingPool : votingPools.values())
+			if (votingPool.containsKey(worker)
+					&& votingPool.get(worker) == null)
+				return true;
+		return false;
 	}
 
 	/**
 	 * Gives the result of a worker for a given job.
 	 */
-	public void submitWorkerResult(Worker worker, J job, R result) {
-		reputationSystem.setWorkerResult(worker, job, result);
+	public J submitResultAndPullJob(Worker worker, J job, R result) {
+		if (job != null) {
+			if (!votingPools.containsKey(job)
+					|| !votingPools.get(job).containsKey(worker))
+				throw new UnsupportedOperationException(
+						"This worker was never assigned to this job");
+			if (votingPools.get(job).get(worker) != null)
+				throw new UnsupportedOperationException(
+						"This worker has already computed this job");
 
-		/* Retreive the list of previous computed result for the current job */
-		List<Worker> workersList = resultingWorkers.get(job);
-		workersList.add(worker);
-		resultingResults.get(job).add(result);
+			final VotingPool<R> votingPool = votingPools.get(job);
+			if (result == null) {
+				/*
+				 * The worker gives up the computation without asking for
+				 * another job
+				 */
+				votingPool.remove(worker);
+				if (votingPool.isComplete()) {
+					processingJobs.remove(job);
+					activeJobs.add(job);
+				}
+				return null;
+			} else {
+				logger.fine("Worker " + worker + " returns result " + result
+						+ " for job " + job);
+				votingPool.put(worker, result);
+				if (reputationSystem != null)
+					reputationSystem.setWorkerResult(worker, job, result);
 
-		/* Try to get result for postponed jobs */
-		for (J postponedJob : new HashSet<J>(postponedJobs)) {
-			postponedJobs.remove(postponedJob);
-			findJobResult(postponedJob);
+				if (votingPool.isComplete()) {
+					processingJobs.remove(job);
+					/* Try to certify one of the results for the given job */
+					final R certifiedResult = resultCertificator
+							.certifyResult(votingPool);
+					/* Update the sets of jobs accordingly */
+					// TODO takes also into account the maximum number of
+					// workers
+					if (certifiedResult != null) {
+						terminatedJobs.add(job);
+						votingPools.remove(votingPool);
+						if (reputationSystem != null)
+							reputationSystem.setCertifiedResult(job,
+									certifiedResult);
+						if (listener != null)
+							listener.setCertifiedResult(votingPool,
+									certifiedResult);
+					} else
+						activeJobs.add(job);
+				}
+			}
+		} else
+			assert (!isAssigned(worker)) : "A worker may not compute several jobs at the same time";
+
+		/* Call custom mechanism for pulling a new job */
+		J pulledJob = pullJobFromSets(worker);
+		if (pulledJob == null) {
+			if (availableJobs.isEmpty())
+				// TODO specifies that current processing and active jobs may be
+				// run
+				return null;
+			else {
+				/* Activate the next job */
+				pulledJob = availableJobs.poll();
+				if (availableJobs.isEmpty() && listener != null)
+					listener.endOfJobQueue();
+			}
 		}
+		logger.fine("Worker " + worker + " pull job " + pulledJob);
 
-		/* Try to get the best result if all jobs have been computed */
-		if (workersList.size() == workersJob.get(job).size()) {
-			for (J initialJob : resultingWorkers.keySet())
-				if (job.equals(initialJob))
-					job = initialJob;
-			findJobResult(job);
-		}
+		/* Update job sets */
+		activeJobs.remove(pulledJob);
+		processingJobs.add(pulledJob);
+
+		/* Update voting pools */
+		if (!votingPools.containsKey(pulledJob))
+			votingPools.put(pulledJob, new VotingPool<R>(pulledJob));
+		votingPools.get(pulledJob).put(worker, null);
+
+		return pulledJob;
 	}
 
 	/**
-	 * Returns the selected result if enough informations are available. This
-	 * method, along with the next, are the main reasons of the use of generics
-	 * here.
+	 * Requests a job for a given worker from the sets of active and processing
+	 * jobs. This method justifies the use of generic.
 	 */
-	public Map<J, R> getCertifiedResults() {
-		Map<J, R> result = new HashMap<J, R>(resultsFound);
-		resultsFound.clear();
-		return result;
+	abstract protected J pullJobFromSets(Worker worker);
+
+	/**
+	 * Specifies the listener that will handles the job submissions and the
+	 * certified results for this scheduler
+	 */
+	public void putSchedulerListener(SchedulerListener schedulerListener) {
+		listener = schedulerListener;
 	}
 
 }

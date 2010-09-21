@@ -1,12 +1,11 @@
 package simdeg.util;
 
+import static org.junit.Assert.assertEquals;
 import static simdeg.util.InverseMath.inverseIncompleteBeta;
-import static simdeg.util.InverseMath.inverseStandardNormal;
 import static simdeg.util.InverseMath.inverseNormal;
+import static simdeg.util.InverseMath.inverseStandardNormal;
 
 import org.junit.Test;
-import org.junit.Before;
-import static org.junit.Assert.*;
 
 public class TestInverseMath {
 

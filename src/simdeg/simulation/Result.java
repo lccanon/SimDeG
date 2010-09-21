@@ -1,99 +1,62 @@
 package simdeg.simulation;
 
-import java.util.Set;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
+
+import simdeg.util.HashableObject;
 
 /**
  * Specify the kind of possible results for the simulator and the scheduling
  * algorithms.
  */
-class Result implements simdeg.reputation.Result {
+class Result extends HashableObject implements simdeg.reputation.Result {
 
-    enum ResultType {ATTACK, FAILED, BUG, CORRECT, LAST};
+	/** All the correct result are the same */
+	private final static Result correct = new Result();
 
-    private ResultType type;
+	/** The results for each group of collusion */
+	private static Map<CollusionGroup, Result> colludedResults = new HashMap<CollusionGroup, Result>();
 
-    private Set<CollusionGroup> colludingGroup = new HashSet<CollusionGroup>();
+	/** The results for each group of inter-collusion */
+	private static Map<InterCollusionGroup, Result> interColludedResults = new HashMap<InterCollusionGroup, Result>();
 
-    private boolean syncSuccess = false;
+	protected static Result getCorrectResult() {
+		return correct;
+	}
 
-    Result(ResultType type) {
-        this.type = type;
-        syncSuccess = (type == ResultType.ATTACK);
-    }
+	/**
+	 * Returns a new result each time a worker failed. Each new result are
+	 * distincts.
+	 */
+	protected static Result getFailedResult() {
+		return new Result();
+	}
 
-    Result(ResultType type, CollusionGroup colludingGroup) {
-        this(type);
-        this.colludingGroup.add(colludingGroup);
-    }
+	protected static Result getColludedResult(CollusionGroup collusionGroup) {
+		if (!colludedResults.containsKey(collusionGroup))
+			colludedResults.put(collusionGroup, new Result());
+		return colludedResults.get(collusionGroup);
+	}
 
-    Result(ResultType type, Set<CollusionGroup> colludingGroup) {
-        this(type);
-        this.colludingGroup.addAll(colludingGroup);
-    }
+	protected static Result getInterColludedResult(
+			InterCollusionGroup interCollusionGroup) {
+		if (!interColludedResults.containsKey(interCollusionGroup))
+			interColludedResults.put(interCollusionGroup, new Result());
+		return interColludedResults.get(interCollusionGroup);
+	}
 
-    Result(ResultType type, boolean missSync) {
-        this.type = type;
-        syncSuccess = !missSync;
-    }
+	public boolean equals(Object aResult) {
+		return this == aResult;
+	}
 
-    Result(ResultType type, Set<CollusionGroup> colludingGroup, boolean missSync) {
-        this(type, colludingGroup);
-        syncSuccess = !missSync;
-    }
-
-    boolean isCorrect() {
-        return type == ResultType.CORRECT;
-    }
-
-    boolean isLast() {
-        return type == ResultType.LAST;
-    }
-
-    ResultType getType() {
-        return type;
-    }
-
-    Set<CollusionGroup> getColludingGroup() {
-        return colludingGroup;
-    }
-
-    /**
-     * Specifies if the worker that decides this result was able to synchronize
-     * with other attacker or not.
-     */
-    boolean isSyncSuccess() {
-        return syncSuccess;
-    }
-
-    public boolean equals(Object aResult) {
-        if (this == aResult)
-            return true;
-        if (!(aResult instanceof Result))
-            return false;
-        Result result = (Result)aResult;
-        if (type == ResultType.FAILED || result.getType() == ResultType.FAILED)
-            return false;
-        if (type == result.getType() && colludingGroup.equals(getColludingGroup()))
-            return true;
-        return false;
-    }
-
-    private static int count = 0;
-    private final int hash = count++;
-    /**
-     * Used for HashSet.
-     */
-    public final int hashCode() {
-        if (type == ResultType.FAILED)
-            return hash;
-        if (null == colludingGroup)
-            return type.hashCode();
-        return colludingGroup.hashCode();
-    }
-
-    public String toString() {
-        return type + " " + colludingGroup;
-    }
+	public String toString() {
+		if (this == correct)
+			return "T";
+		if (colludedResults.containsValue(this))
+			return "C";
+		if (interColludedResults.containsValue(this))
+			return "I";
+		return "F";
+	}
 
 }

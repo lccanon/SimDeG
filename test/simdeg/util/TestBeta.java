@@ -51,7 +51,7 @@ public class TestBeta {
         Beta b5 = new Beta(10.0d, 20.0d, 100.0d, 100000.0d);
         assertTrue("Error too high: " + b5.getError(),
                 b5.getError() < BIG_EPSILON);
-        /* Test with a high variance in a lare range */
+        /* Test with a high variance in a large range */
         Beta b6 = new Beta(0.0d, 100.0d, 1.0d, 10.0d);
         assertTrue("Error out of range: " + b6.getError(),
                 b6.getError() < 25.0d && b6.getError() > 10.0d);

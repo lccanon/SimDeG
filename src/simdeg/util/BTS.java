@@ -1,8 +1,8 @@
 package simdeg.util;
 
-import java.util.logging.Logger;
 import static java.lang.Math.pow;
-import static java.lang.Math.sqrt;
+
+import java.util.logging.Logger;
 
 /**
  * Estimator for Bernoulli Trial only. It is based on Successive values

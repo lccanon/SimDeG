@@ -6,7 +6,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Class creating Look-Up Table objets containing previously computed
+ * Class creating Look-Up Table objects containing previously computed
  * results. For unary functions. Does not work with short, byte and atomic
  * types. Also possible to achieve the same result with two unary LUT since,
  * for now, there is no interpolation.

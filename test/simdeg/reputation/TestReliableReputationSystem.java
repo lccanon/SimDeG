@@ -1,19 +1,17 @@
 package simdeg.reputation;
 
-import simdeg.util.RV;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Set;
 import java.util.HashSet;
-import java.util.Random;
 import java.util.NoSuchElementException;
+import java.util.Random;
+import java.util.Set;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import simdeg.util.RV;
 
 public class TestReliableReputationSystem {
 
@@ -31,8 +29,8 @@ public class TestReliableReputationSystem {
     }
 
     @Test public void getReliability() {
-        ReliableReputationSystem rrs
-            = new ReliableReputationSystem();
+        ReliableReputationSystem<Worker> rrs
+            = new ReliableReputationSystem<Worker>();
         rrs.addAllWorkers(workers);
         RV reliability = rrs.getReliability(worker);
         assertTrue("Error too low: " + reliability.getError(),
@@ -41,14 +39,14 @@ public class TestReliableReputationSystem {
 
     @Test(expected=NoSuchElementException.class)
     public void getReliabilityException() {
-        ReliableReputationSystem rrs
-            = new ReliableReputationSystem();
+        ReliableReputationSystem<Worker> rrs
+            = new ReliableReputationSystem<Worker>();
         rrs.getReliability(worker);
     }
 
     @Test public void scenarioSimple() {
         /* Initializations and declarations */
-        ReliableReputationSystem rrs = new ReliableReputationSystem();
+        ReliableReputationSystem<Worker> rrs = new ReliableReputationSystem<Worker>();
         rrs.addAllWorkers(workers);
         /* Scenario with two sets */
         Random rand = new Random(0L);

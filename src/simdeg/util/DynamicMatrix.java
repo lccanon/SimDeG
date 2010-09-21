@@ -29,7 +29,7 @@ public class DynamicMatrix<E> {
     private final Map<E,Set<E>> reverse = new HashMap<E,Set<E>>();
 
     /** Biggest set */
-    private Set<E> biggest = null;
+    private Set<E> largest = null;
 
     /** Estimator that will be cloned everywhere (directly on the diagonal) */
     private final Estimator estimatorBase;
@@ -47,7 +47,7 @@ public class DynamicMatrix<E> {
         Set<Set<E>> sets = getSets(elements);
         for (Set<E> set : sets)
             insertSet(set);
-        biggest = null;
+        largest = null;
     }
 
     public void removeAll(Collection<? extends E> elements) {
@@ -76,7 +76,7 @@ public class DynamicMatrix<E> {
         /* Update reverse and biggest */
         for (E element : elements)
             reverse.remove(element);
-        biggest = null;
+        largest = null;
     }
 
     public Set<E> getAll() {
@@ -87,7 +87,7 @@ public class DynamicMatrix<E> {
         if (reverse.containsKey(element))
             return reverse.get(element);
         else
-            throw new NoSuchElementException("Element never intialized");
+            throw new NoSuchElementException("Element never initialized");
     }
 
     public Set<Set<E>> getSets(Collection<? extends E> elements) {
@@ -118,10 +118,10 @@ public class DynamicMatrix<E> {
         return matrix.get(set1).get(set2);
     }
 
-    public Set<E> getBiggest() {
-        if (biggest == null || biggest.isEmpty())
-            updateBiggest();
-        return biggest;
+    public Set<E> getLargest() {
+        if (largest == null || largest.isEmpty())
+            updateLargest();
+        return largest;
     }
 
     /* TODO getGeneralError()
@@ -135,7 +135,7 @@ public class DynamicMatrix<E> {
     public double getGeneralError() {
         double result = 0.0d;
         for (Set<E> set : matrix.keySet())
-            result += getEstimator(getBiggest(), set).getError();
+            result += getEstimator(getLargest(), set).getError();
         result /= matrix.keySet().size();
         return result;
     }
@@ -163,8 +163,8 @@ public class DynamicMatrix<E> {
         /* Update reverse for all concerned elements */
         updateReverse(merge);
         /* Postpone the update of biggest */
-        if (biggest != null && merge.size() > biggest.size())
-            biggest = null;
+        if (largest != null && merge.size() > largest.size())
+            largest = null;
         return merge;
     }
 
@@ -193,8 +193,8 @@ public class DynamicMatrix<E> {
         reverse.put(element, newSet);
         updateReverse(initialSet);
         /* Postpone the update of biggest */
-        if (biggest == set)
-            biggest = null;
+        if (largest == set)
+            largest = null;
     }
 
     /**
@@ -260,12 +260,12 @@ public class DynamicMatrix<E> {
         assert (checkReverse()) : "Reverse malformed";
     }
 
-    private void updateBiggest() {
+    private void updateLargest() {
         for (Set<E> set : matrix.keySet())
-            if (biggest == null || set.size() > biggest.size())
-                biggest = set;
-        if (biggest == null)
-            biggest = new HashSet<E>();
+            if (largest == null || set.size() > largest.size())
+                largest = set;
+        if (largest == null)
+            largest = new HashSet<E>();
     }
 
     private void clean(Set<E> remove) {

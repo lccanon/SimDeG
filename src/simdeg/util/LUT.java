@@ -1,15 +1,14 @@
 package simdeg.util;
 
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 
 /**
- * Class creating Look-Up Table objets containing previously computed
+ * Class creating Look-Up Table objects containing previously computed
  * results.
  */
-abstract class LUT<E extends Number, R> {
+abstract class LUT {
 
     /**
      * Turn around java API limitation.

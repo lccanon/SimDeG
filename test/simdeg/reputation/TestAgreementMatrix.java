@@ -27,9 +27,8 @@ public class TestAgreementMatrix {
 
     private static final double LARGE_EPSILON = 1E-1d;
     private static final double BIG_EPSILON = 1E-2d;
-    private static final double EPSILON = 1E-5d;
 
-    private AgreementMatrix matrix;
+    private AgreementMatrix<Worker> matrix;
 
     @BeforeClass public static void createWorkers() {
         workers1 = new HashSet<Worker>();
@@ -54,7 +53,7 @@ public class TestAgreementMatrix {
     }
 
     @Before public void createMatrix() {
-        matrix = new AgreementMatrix(new BetaEstimator(1.0d));
+        matrix = new AgreementMatrix<Worker>(new BetaEstimator(1.0d));
     }
 
     private void checkFirstLine(RV[][] agreement) {
@@ -66,7 +65,7 @@ public class TestAgreementMatrix {
 
     @Test(expected=OutOfRangeException.class)
     public void agreementMatrixException() {
-        new AgreementMatrix(new BetaEstimator(0.0d));
+        new AgreementMatrix<Worker>(new BetaEstimator(0.0d));
     }
 
     @Test public void merge() {
@@ -84,7 +83,7 @@ public class TestAgreementMatrix {
                     matrix.decreaseAgreement(otherWorker, worker);
                 }
         }
-        assertEquals(29, matrix.getBiggest().size());
+        assertEquals(29, matrix.getLargest().size());
         RV[][] agreement = matrix.getAgreements(workers);
         assertEquals(2, agreement.length);
         checkFirstLine(agreement);
@@ -109,7 +108,7 @@ public class TestAgreementMatrix {
             for (Worker worker : workers)
                 for (Worker otherWorker : workers)
                     matrix.decreaseAgreement(worker, otherWorker);
-        assertEquals(1, matrix.getBiggest().size());
+        assertEquals(1, matrix.getLargest().size());
         RV[][] agreement = matrix.getAgreements(workers);
         assertEquals(39, agreement.length);
         checkFirstLine(agreement);
@@ -140,7 +139,7 @@ public class TestAgreementMatrix {
         }
         RV[][] agreement = matrix.getAgreements(workers);
         checkFirstLine(agreement);
-        assertEquals(29, matrix.getBiggest().size());
+        assertEquals(29, matrix.getLargest().size());
         assertEquals(2, agreement.length);
         assertEquals(1.0d, agreement[1][0].getMean(), BIG_EPSILON);
         assertEquals(0.5d, agreement[1][1].getMean(), BIG_EPSILON);
@@ -166,7 +165,7 @@ public class TestAgreementMatrix {
         }
         RV[][] agreement = matrix.getAgreements(workers);
         checkFirstLine(agreement);
-        assertEquals(29, matrix.getBiggest().size());
+        assertEquals(29, matrix.getLargest().size());
         assertEquals(2, agreement.length);
         assertEquals(1.0d, agreement[1][0].getMean(), BIG_EPSILON);
         assertEquals(0.5d, agreement[1][1].getMean(), LARGE_EPSILON);

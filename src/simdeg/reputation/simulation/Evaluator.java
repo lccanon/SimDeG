@@ -29,7 +29,7 @@ class Evaluator {
         = Logger.getLogger(Evaluator.class.getName());
 
     /** Reputation system being tested */
-    private ReputationSystem reputationSystem = null;
+    private ReputationSystem<Worker> reputationSystem = null;
 
     /** Simulator time */
     private static long startTime = System.currentTimeMillis();
@@ -49,7 +49,7 @@ class Evaluator {
     /**
      * Constructor specifying the measured reputation system.
      */
-    protected Evaluator(ReputationSystem reputationSystem,
+    protected Evaluator(ReputationSystem<Worker> reputationSystem,
             String fileCharacteristic) {
         this.reputationSystem = reputationSystem;
         /* Read characteristic file */
@@ -92,6 +92,7 @@ class Evaluator {
             if (!colGroups.containsKey(group))
                 colGroups.put(group, new HashSet<Worker>());
             colGroups.get(group).add(worker);
+            scanner.nextDouble();
         }
         logger.config("Reliability characteristics read");
 
@@ -158,13 +159,13 @@ class Evaluator {
     /**
      * Notifies the progress of the simulation.
      */
-    protected void setStep(long timestamp) {
+    protected void setStep(double timestamp) {
         if (timestamp < 0)
-            throw new OutOfRangeException(timestamp, 0, Long.MAX_VALUE);
+            throw new OutOfRangeException(timestamp, 0, Double.MAX_VALUE);
 
         List<List<Double>> measures = performMeasures();
 
-        logger.info(String.format("%d,%12g,%12g,%12g,%12g,%12g,%12g,%12g,"
+        logger.info(String.format("%.15g,%12g,%12g,%12g,%12g,%12g,%12g,%12g,"
                     + "%12g,%12g,%12g", timestamp,
                     (System.currentTimeMillis() - startTime) * 1E-3d,
                     measures.get(0).get(0), measures.get(0).get(1), measures.get(0).get(2),

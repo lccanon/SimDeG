@@ -1,70 +1,69 @@
 package simdeg.reputation;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-import java.util.Arrays;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import simdeg.util.BetaEstimator;
-import simdeg.util.Collections;
-import simdeg.util.RV;
 import simdeg.util.Estimator;
+import simdeg.util.RV;
 
 /**
  * Strategy considering only failures.
  */
-public class ReliableReputationSystem implements BasicReputationSystem {
+public class ReliableReputationSystem<W extends Worker> implements BasicReputationSystem<W> {
 
 	/** Logger */
 	private static final Logger logger = Logger
 			.getLogger(ReliableReputationSystem.class.getName());
 
 	/** Workers sorted by result for each job (for collusion) */
-    protected Map<Job, Map<Result, Set<Worker>>> workersByResults
-        = new HashMap<Job, Map<Result, Set<Worker>>>();
+    protected Map<Job, Map<Result, Set<W>>> workersByResults
+        = new HashMap<Job, Map<Result, Set<W>>>();
 
     /** Estimates of the reliability */
-    private Map<Worker, Estimator> reliability = new HashMap<Worker, Estimator>();
+    private Map<W, Estimator> reliability = new HashMap<W, Estimator>();
     
     /** Set of workers we are manipulating */
-    protected Set<Worker> workers = new HashSet<Worker>();
+    protected Set<W> workers = new HashSet<W>();
 
 	/**
 	 * Gives participating workers.
 	 */
-	public void addAllWorkers(Set<? extends Worker> workers) {
+	public void addAllWorkers(Set<? extends W> workers) {
         this.workers.addAll(workers);
-		for (Worker worker : workers)
+		for (W worker : workers)
 			reliability.put(worker, new BetaEstimator());
 	}
 
 	/**
 	 * Remove participating workers.
 	 */
-	public void removeAllWorkers(Set<? extends Worker> workers) {
+	public void removeAllWorkers(Set<? extends W> workers) {
         this.workers.removeAll(workers);
-		for (Worker worker : workers)
+		for (W worker : workers)
 			reliability.remove(worker);
 	}
 
 	/**
 	 * Informs to the reputation system a triple of worker, job, and result.
 	 */
-    public void setWorkerResult(Worker worker, Job job, Result result) {
+    public void setWorkerResult(W worker, Job job, Result result) {
 		/* Update data structures related to collusion and fault */
 		if (!workersByResults.containsKey(job))
-			workersByResults.put(job, new HashMap<Result, Set<Worker>>());
-        final Map<Result, Set<Worker>> workersByResult = workersByResults.get(job);
+			workersByResults.put(job, new HashMap<Result, Set<W>>());
+        final Map<Result, Set<W>> workersByResult = workersByResults.get(job);
 		if (!workersByResult.containsKey(result))
-			workersByResult.put(result, new HashSet<Worker>());
+			workersByResult.put(result, new HashSet<W>());
 		workersByResult.get(result).add(worker);
 
 		/* Update successful worker(s) */
 		if (workersByResult.get(result).size() == 2) {
-            for (Worker successfulWorker : workersByResult.get(result))
+            for (W successfulWorker : workersByResult.get(result))
                 if (this.workers.contains(successfulWorker))
                     reliability.get(successfulWorker).setSample(1.0d);
         } else if (workersByResult.get(result).size() > 2)
@@ -73,11 +72,11 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 	}
 
 	/**
-	 * Informs to the reputation system a pair containing a job and the
-	 * certfified result associated to it.
+	 * Gives to the reputation system a pair containing a job and the
+	 * certified result associated to it.
 	 */
 	public void setCertifiedResult(Job job, Result result) {
-		Map<Result, Set<Worker>> workersByResult = workersByResults.get(job);
+		Map<Result, Set<W>> workersByResult = workersByResults.get(job);
 
 		/*
 		 * Remove every colluding group of results and consider the rest as
@@ -86,7 +85,7 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 		for (Result otherResult : workersByResult.keySet())
 			if (workersByResult.get(otherResult).size() == 1
 					&& otherResult != result)
-                for (Worker worker : workersByResult.get(otherResult))
+                for (W worker : workersByResult.get(otherResult))
                     if (this.workers.contains(worker))
                         reliability.get(worker).setSample(0.0d);
 
@@ -97,7 +96,7 @@ public class ReliableReputationSystem implements BasicReputationSystem {
 	/**
 	 * Returns the estimated reliability of the worker.
 	 */
-	public RV getReliability(Worker worker) {
+	public RV getReliability(W worker) {
 		if (!reliability.containsKey(worker))
 			throw new NoSuchElementException("Inexistant worker");
 		logger.finer("Reliability of worker " + worker + " is "
