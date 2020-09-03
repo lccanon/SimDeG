@@ -90,6 +90,8 @@ class Simulator implements SchedulerListener {
 	/** Length of the timeout: 10 days */
 	private static final double TIMEOUT = 10 * 24 * 60 * 60;
 
+	private static final String SETI_AVAILABILITY_NAME = "event_trace.tab";
+
 	private long startingTime;
 
 	/** Number of jobs that needs to be computed */
@@ -104,15 +106,19 @@ class Simulator implements SchedulerListener {
 	/** Contains the job costs */
 	private final Scanner jobsTrace;
 
+	/** Specifies if the performance file corresponds to the SETI@Home trace */
+	private final boolean completeSetiSettings;
+
 	/** Maps the id in the trace files to the created workers */
 	private final Map<Integer, Worker> correspondence;
 
 	private final FileWriter output;
 
+	private final File outputRep;
+
 	/** Ordered set of events that are chronologically considered */
 	private final TreeSet<Event> events = new TreeSet<Event>(
 			new Comparator<Event>() {
-				@Override
 				public int compare(Event arg0, Event arg1) {
 					if (arg0.getDate() < arg1.getDate())
 						return -1;
@@ -145,18 +151,31 @@ class Simulator implements SchedulerListener {
 	private int certifiedJobs;
 
 	/** Builds a simulator with the given properties and output file */
-	protected Simulator(Properties properties, File output) throws IOException {
+	protected Simulator(Properties properties) throws IOException {
+		/* Initialize the seeds */
+		final long platformSeed = Long.parseLong(properties
+				.getProperty("platformSeed"));
+		RandomManager.setSeed("platform", platformSeed);
+		final long reliabilitySeed = Long.parseLong(properties
+				.getProperty("reliabilitySeed"));
+		RandomManager.setSeed("reliability", reliabilitySeed);
+
+		/* Detect if the availability trace file is the SETI@Home one */
+		final String name = properties.getProperty("availabilityTraceFile");
+		completeSetiSettings = name.substring(
+				name.length() - SETI_AVAILABILITY_NAME.length()).equals(
+				SETI_AVAILABILITY_NAME);
+
 		/* Build workers */
 		final int workersNumber = Integer.parseInt(properties
 				.getProperty("workersNumber"));
-		final File availabilityTraceFile = new File(properties
-				.getProperty("availabilityTraceFile"));
+		final File availabilityTraceFile = new File(name);
 		correspondence = buildPlatform(workersNumber, availabilityTraceFile);
 		logger.info("Found first " + workersNumber + " workers");
 
 		final File workersSpeedFile = new File(properties
 				.getProperty("workersSpeedFile"));
-		setPlatformSpeed(correspondence, workersSpeedFile);
+		setPlatformSpeed(correspondence, workersSpeedFile, completeSetiSettings);
 		final Set<Worker> workers = new HashSet<Worker>(correspondence.values());
 		logger.info("The speeds of the workers are set");
 
@@ -169,24 +188,24 @@ class Simulator implements SchedulerListener {
 		logger.info("The reliability of the workers are set");
 
 		/* Build collusion groups */
-		List<Double> collusionFraction = parseList(Double.class, properties
-				.getProperty("collusionFraction"));
-		List<Double> collusionProbability = parseList(Double.class, properties
-				.getProperty("collusionProbability"));
+		final List<Double> collusionFraction = parseList(Double.class,
+				properties.getProperty("collusionFraction"));
+		final List<Double> collusionProbability = parseList(Double.class,
+				properties.getProperty("collusionProbability"));
 		collusionGroups = buildCollusionGroup(workers, collusionFraction,
 				collusionProbability);
 		logger.info("The workers are set in groups of collusion");
 
 		/* Build inter-collusion groups */
-		List<List<Integer>> interCollusionFraction = parseListOfList(
+		final List<List<Integer>> interCollusionFraction = parseListOfList(
 				Integer.class, properties.getProperty("interCollusionFraction"));
-		List<Double> interCollusionProbability = parseList(Double.class,
+		final List<Double> interCollusionProbability = parseList(Double.class,
 				properties.getProperty("interCollusionProbability"));
 		interCollusionGroups = buildInterCollusionGroup(workers,
 				collusionGroups, interCollusionFraction,
 				interCollusionProbability);
-		logger
-				.info("The groups of collusion are set in groups of inter-collusion");
+		logger.info("The groups of collusion are set"
+				+ " in groups of inter-collusion");
 		/* Decision tree creation */
 		new InterCollusionDecisionTree(interCollusionGroups);
 		logger.info("Decision tree is built");
@@ -201,10 +220,10 @@ class Simulator implements SchedulerListener {
 		jobsTrace.nextLine();
 
 		/* Build scheduling components */
-		String schedulerClassName = properties.getProperty("scheduler");
-		String resultCertificatorClassName = properties
+		final String schedulerClassName = properties.getProperty("scheduler");
+		final String resultCertificatorClassName = properties
 				.getProperty("resultCertificator");
-		String reputationSystemClassName = properties
+		final String reputationSystemClassName = properties
 				.getProperty("reputationSystem");
 		scheduler = getScheduler(schedulerClassName,
 				resultCertificatorClassName, reputationSystemClassName);
@@ -213,7 +232,11 @@ class Simulator implements SchedulerListener {
 		scheduler.addAllWorkers(workers);
 		scheduler.putSchedulerListener(this);
 
-		this.output = new FileWriter(output);
+		/* Initialize the output files */
+		final String outputFile = properties.getProperty("outputFile");
+		this.output = new FileWriter(new File(outputFile));
+		final String reputationFile = properties.getProperty("reputationFile");
+		this.outputRep = new File(reputationFile);
 	}
 
 	/**
@@ -221,16 +244,18 @@ class Simulator implements SchedulerListener {
 	 * arguments. It then runs the simulation.
 	 */
 	public static void main(String[] args) throws IOException {
+//		System.out.println(System.getProperties().get("bibi"));
+//		System.out.println(Long.parseLong((String) System.getProperties().get("bibo")));
+//		System.out.println(System.getProperties().get("biba"));
 		Locale.setDefault(Locale.ENGLISH);
-		if (args.length < 2) {
-			System.err.println("Usage : java simdeg.simulator.Simulator"
-					+ " configurationFile outputFile");
-			System.exit(1);
+		Properties properties;
+		try {
+			properties = new Properties();
+			properties.load(new FileInputStream(args[0]));
+		} catch (Exception e) {
+			properties = System.getProperties();
 		}
-
-		final Properties properties = new Properties();
-		properties.load(new FileInputStream(args[0]));
-		final Simulator simulator = new Simulator(properties, new File(args[1]));
+		final Simulator simulator = new Simulator(properties);
 		simulator.run();
 	}
 
@@ -409,10 +434,10 @@ class Simulator implements SchedulerListener {
 		availabilityTrace.close();
 		jobsTrace.close();
 		try {
-			// TODO remove this
-			if (scheduler.getReputationSystem() != null)
-				output.write(scheduler.getReputationSystem() + "");
 			output.close();
+			final FileWriter outputRep = new FileWriter(this.outputRep);
+			outputRep.write(scheduler.getReputationSystem() + "");
+			outputRep.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -444,31 +469,43 @@ class Simulator implements SchedulerListener {
 	 * Sets the speed of each worker with the workers performance file.
 	 */
 	private static void setPlatformSpeed(Map<Integer, Worker> correspondence,
-			File workersSpeedFile) throws FileNotFoundException {
+			File workersSpeedFile, boolean completeSetiSettings)
+			throws FileNotFoundException {
 		int done = 0;
 		Scanner scanner = new Scanner(workersSpeedFile);
 		scanner.nextLine();
-		while (scanner.hasNextLine() && done != correspondence.size()) {
-			scanner.next();
-			final int id = scanner.nextInt();
-			if (correspondence.containsKey(id)) {
+		if (completeSetiSettings) {
+			while (scanner.hasNextLine() && done != correspondence.size()) {
 				scanner.next();
-				scanner.next();
-				try {
-					final double fops = scanner.nextDouble();
-					correspondence.get(id).setFOPS(fops);
-					done++;
-				} catch (InputMismatchException e) {
-					System.err.println("Missing values in the platform file");
-					System.exit(1);
+				final int id = scanner.nextInt();
+				if (correspondence.containsKey(id)) {
+					scanner.next();
+					scanner.next();
+					try {
+						final double fops = scanner.nextDouble();
+						correspondence.get(id).setFOPS(fops);
+						done++;
+					} catch (InputMismatchException e) {
+						System.err.println("Missing values in"
+								+ " the platform file");
+						System.exit(1);
+					}
 				}
+				scanner.nextLine();
 			}
-			scanner.nextLine();
+			if (done != correspondence.size())
+				throw new UnsupportedOperationException(
+						"Some worker speeds are not set");
+		} else {
+			for (Worker worker : correspondence.values()) {
+				for (int i = 0; i < 4; i++)
+					scanner.next();
+				final double fops = scanner.nextDouble();
+				worker.setFOPS(fops);
+				scanner.nextLine();
+			}
 		}
 		scanner.close();
-		if (done != correspondence.size())
-			throw new UnsupportedOperationException(
-					"Some worker speeds are not set");
 	}
 
 	/**
@@ -591,20 +628,18 @@ class Simulator implements SchedulerListener {
 		return null;
 	}
 
-	@Override
 	public void endOfJobQueue() {
 		if (submittedJobs < jobsNumber && jobsTrace.hasNext()) {
 			for (int i = 0; i < 5; i++)
 				jobsTrace.next();
 			submittedJobs++;
 			final double fops = jobsTrace.nextDouble();
-			final Job job = new Job(fops);
+			final Job job = new Job(completeSetiSettings ? fops : fops / 200);
 			logger.fine("Create new job " + job + " with " + fops + " FOPS");
 			scheduler.addJob(job);
 		}
 	}
 
-	@Override
 	public <J extends simdeg.reputation.Job, R extends simdeg.reputation.Result> void setCertifiedResult(
 			VotingPool<R> votingPool, R result) {
 		assert (submittedJobs >= certifiedJobs) : "More certified jobs than submitted ones";

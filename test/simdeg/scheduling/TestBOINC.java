@@ -24,12 +24,10 @@ public class TestBOINC implements SchedulerListener {
 
 	Map<Job, Result> certifiedResult = null;
 
-	@Override
 	public void endOfJobQueue() {
 		// TODO test event
 	}
 
-	@Override
 	public <J extends Job, R extends Result> void setCertifiedResult(
 			VotingPool<R> votingPool, R result) {
 		certifiedResult.put(votingPool.getJob(), result);

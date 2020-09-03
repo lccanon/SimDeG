@@ -32,7 +32,7 @@ abstract public class Scheduler<J extends Job, R extends Result> {
 	 */
 	protected ReputationSystem<Worker> reputationSystem;
 
-	/** Jobs available for being added to workers waiting queues */
+	/** Jobs available for being sent to workers */
 	protected Queue<J> availableJobs = new ArrayDeque<J>();
 
 	/** Jobs that have been processed but not currently */

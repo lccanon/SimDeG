@@ -41,7 +41,6 @@ class TrueReputationSystem implements ReputationSystem<Worker> {
 		return new Beta(worker.getReliability());
 	}
 
-	@Override
 	public RV getCollusionLikelihood(Set<Worker> workers) {
 		Set<CollusionGroup> groups = new HashSet<CollusionGroup>();
 		for (Worker worker : workers)
@@ -58,7 +57,6 @@ class TrueReputationSystem implements ReputationSystem<Worker> {
 		return new Beta(interCollusion);
 	}
 
-	@Override
 	public Map<Worker, RV> getCollusionLikelihood(Worker worker,
 			Set<Worker> workers) {
 		final CollusionGroup group = worker.getCollusionGroup();
@@ -81,12 +79,10 @@ class TrueReputationSystem implements ReputationSystem<Worker> {
 		return result;
 	}
 
-	@Override
 	public RV getColludersFraction() {
 		return new Beta(colludersFraction);
 	}
 
-	@Override
 	public Set<? extends Set<Worker>> getGroups(Collection<Worker> workers) {
 		final Set<CollusionGroup> result = new HashSet<CollusionGroup>();
 		for (Worker worker : workers)
@@ -94,7 +90,6 @@ class TrueReputationSystem implements ReputationSystem<Worker> {
 		return result;
 	}
 
-	@Override
 	public Set<Worker> getLargestGroup() {
 		// TODO Auto-generated method stub
 		return null;

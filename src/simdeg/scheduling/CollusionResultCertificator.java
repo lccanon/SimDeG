@@ -23,7 +23,7 @@ public class CollusionResultCertificator extends ResultCertificator {
 			.getLogger(CollusionResultCertificator.class.getName());
 
 	private static final double ZERO_PROBA = 0.001d;
-	
+
 	private static final int MAX_UNION = 5;
 
 	private static final double CORRECTNESS_PROBA = 0.95d;
@@ -87,7 +87,35 @@ public class CollusionResultCertificator extends ResultCertificator {
 		 */
 		final Map<R, Set<Worker>> map = votingPool.getJobsByResult();
 
-		/* Select the result that is part of the observed non-colluding group */
+		final Map<R, RV> correctProba = new HashMap<R, RV>();
+
+		/*
+		 * If all the results are singletons, returns the incorrectness
+		 * probabilities of each workers.
+		 */
+//		for (R result : map.keySet()) {
+//			final Set<Worker> workers = map.get(result);
+//			if (workers.size() != 1) {
+//				correctProba.clear();
+//				break;
+//			}
+//
+//			final RV collusion = new RV(reputationSystem
+//					.getCollusionLikelihood(workers));
+//			final RV unreliability = new RV(reputationSystem.getReliability(
+//					workers.iterator().next()).add(-1.0d).multiply(-1.0d));
+//			final RV negative = new RV(-1.0d, 0.0d);
+//			final RV incorrectness = collusion.add(unreliability).subtract(
+//					collusion.mult(unreliability)).add(negative.mult(negative));
+//			correctProba.put(result, incorrectness);
+//		}
+//		if (!correctProba.isEmpty())
+//			return correctProba;
+
+		/*
+		 * Select the result that comes from the observed non-colluding group if
+		 * possible.
+		 */
 		final Set<Worker> largest = reputationSystem.getLargestGroup();
 		for (R result : map.keySet()) {
 			if (map.get(result).size() == 1)
@@ -98,10 +126,11 @@ public class CollusionResultCertificator extends ResultCertificator {
 				if (group == largest) {
 					logger.finer("One of the result is computed by"
 							+ " a worker in the observed non-colluding group");
-					final Map<R, RV> correctProba = new HashMap<R, RV>();
-					correctProba.put(result, new RV(reputationSystem
-							.getCollusionLikelihood(group).add(-1.0d).multiply(
-									-1.0d)));
+					final RV negative = new RV(-1.0d, 0.0d);
+					final RV collusion = new RV(reputationSystem
+							.getCollusionLikelihood(group));
+					correctProba.put(result, collusion.add(negative).mult(
+							negative));
 					return correctProba;
 				}
 		}
@@ -145,7 +174,6 @@ public class CollusionResultCertificator extends ResultCertificator {
 		/*
 		 * Aggregate the intermediate computation for the final results.
 		 */
-		final Map<R, RV> correctProba = new HashMap<R, RV>();
 		for (R result : results) {
 			final RV proba = allOtherColluding.get(result).subtract(
 					allColluding);

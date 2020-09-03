@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import simdeg.util.Beta;
@@ -97,16 +98,18 @@ public class AgreementReputationSystem<W extends Worker> extends
 	 */
 	public RV getCollusionLikelihood(Set<W> workers) {
 		final RV[][] proba = agreement.getAgreements(workers);
-		// TODO put the following into a function 
-//		String probabilities = "[";
-//		for (RV[] prob : proba)
-//			probabilities += Arrays.toString(prob) + ", ";
-//		probabilities += "]";
-//		String size = "";
-//		final List<Set<W>> sets = new ArrayList<Set<W>>(agreement.getSets(workers));
-//		for (Set<W> set : sets)
-//			size += set.size() + ", ";
-//		logger.finest("Agreement probabilities are " + probabilities + " and size " + size);
+		/* Logging */
+		if (logger.isLoggable(Level.FINEST))
+			logger.finest("Agreement probabilities are "
+					+ arraysToString(proba));
+		String size = "";
+		final List<Set<W>> sets = new ArrayList<Set<W>>(agreement
+				.getSets(workers));
+		for (Set<W> set : sets)
+			size += set.size() + ", ";
+		logger.finest("Size are " + size);
+		
+		/* Computation */
 		final RV rv = new Beta(1.0d);
 		for (int i = 0; i < proba[0].length; i++)
 			rv.min(multiply(proba[0][i], -1.0d).add(1.0d));
@@ -124,6 +127,14 @@ public class AgreementReputationSystem<W extends Worker> extends
 		logger.finer("Estimated collusion likelihood of " + workers.size()
 				+ " workers in " + proba.length + " observed groups is " + rv);
 		return rv;
+	}
+
+	private String arraysToString(RV[][] proba) {
+		String probabilities = "[";
+		for (RV[] prob : proba)
+			probabilities += Arrays.toString(prob) + ", ";
+		probabilities += "]";
+		return probabilities;
 	}
 
 	/**
@@ -176,7 +187,7 @@ public class AgreementReputationSystem<W extends Worker> extends
 	public Set<? extends Set<W>> getGroups(Collection<W> workers) {
 		return agreement.getSets(workers);
 	}
-	
+
 	public Set<W> getLargestGroup() {
 		return agreement.getLargest();
 	}

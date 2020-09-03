@@ -141,8 +141,7 @@ public class TestSimulator {
 	@Test
 	public void oneWorkerContinuous() throws IOException {
 		final Properties properties = getInputProperties(10, 1, true, false);
-		final Simulator simulator = new Simulator(properties,
-				new File("output"));
+		final Simulator simulator = new Simulator(properties);
 		simulator.run();
 	}
 
@@ -152,8 +151,7 @@ public class TestSimulator {
 	@Test
 	public void oneWorkerDiscontinuous() throws IOException {
 		final Properties properties = getInputProperties(10, 1, false, false);
-		final Simulator simulator = new Simulator(properties,
-				new File("output"));
+		final Simulator simulator = new Simulator(properties);
 		simulator.run();
 	}
 
@@ -163,8 +161,7 @@ public class TestSimulator {
 	@Test
 	public void oneWorkerContinuousTimeout() throws IOException {
 		final Properties properties = getInputProperties(BIGNUM, 1, true, false);
-		final Simulator simulator = new Simulator(properties,
-				new File("output"));
+		final Simulator simulator = new Simulator(properties);
 		simulator.run();
 	}
 
@@ -175,8 +172,7 @@ public class TestSimulator {
 	@Test
 	public void severalWorkersContinuous() throws IOException {
 		final Properties properties = getInputProperties(10, 3, true, false);
-		final Simulator simulator = new Simulator(properties,
-				new File("output"));
+		final Simulator simulator = new Simulator(properties);
 		simulator.run();
 	}
 
@@ -186,8 +182,7 @@ public class TestSimulator {
 	@Test
 	public void severalWorkersDiscontinuous() throws IOException {
 		final Properties properties = getInputProperties(10, 3, false, false);
-		final Simulator simulator = new Simulator(properties,
-				new File("output"));
+		final Simulator simulator = new Simulator(properties);
 		simulator.run();
 	}
 
@@ -197,8 +192,7 @@ public class TestSimulator {
 	@Test
 	public void severalWorkersDiscontinuousAdversity() throws IOException {
 		final Properties properties = getInputProperties(10, 20, false, true);
-		final Simulator simulator = new Simulator(properties,
-				new File("output"));
+		final Simulator simulator = new Simulator(properties);
 		simulator.run();
 	}
 
